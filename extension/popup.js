@@ -77,11 +77,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 function updateAuthUI() {
-    authStatus.textContent = 'Firebase initialized (no authentication)';
+    if (authStatus) {
+        authStatus.textContent = 'Firebase initialized (no authentication)';
+    }
 }
 
-
-// Authentication removed - Firebase initialized without auth
 
 async function loadStoredData() {
     try {
@@ -135,15 +135,20 @@ function setupEventListeners() {
     changeAvatarBtn.addEventListener('click', resetAvatar);
     
     // Toggle event listeners
-    document.getElementById('autoDetectToggle').addEventListener('click', () => {
-        toggleSetting('autoDetect');
-    });
+    const autoDetectToggleEl = document.getElementById('autoDetectToggle');
+    if (autoDetectToggleEl) {
+        autoDetectToggleEl.addEventListener('click', () => {
+            toggleSetting('autoDetect');
+        });
+    }
     
     document.getElementById('notificationsToggle').addEventListener('click', () => {
         toggleSetting('notifications');
     });
     
-    manualSelectionToggle.addEventListener('click', toggleManualSelection);
+    if (manualSelectionToggle) {
+        manualSelectionToggle.addEventListener('click', toggleManualSelection);
+    }
 }
 
 function handleDragOver(e) {
@@ -199,8 +204,6 @@ function processFile(file) {
             displayAvatar(avatarData);
             showStatus('Photo uploaded successfully!', 'success');
             
-            // NOTE: uploadToFirebase needs to be defined to work, assuming it uses the ID Token
-            // await uploadToFirebase(avatarData); 
         } catch (error) {
             showStatus('Error saving photo', 'error');
         }
@@ -210,16 +213,16 @@ function processFile(file) {
 }
 
 function displayAvatar(avatarData) {
-    avatarImg.src = avatarData.base64;
-    avatarName.textContent = avatarData.fileName;
-    uploadSection.style.display = 'none';
-    avatarPreview.style.display = 'block';
+    if (avatarImg) avatarImg.src = avatarData.base64;
+    if (avatarName) avatarName.textContent = avatarData.fileName;
+    if (uploadSection) uploadSection.style.display = 'none';
+    if (avatarPreview) avatarPreview.style.display = 'block';
 }
 
 function resetAvatar() {
-    uploadSection.style.display = 'block';
-    avatarPreview.style.display = 'none';
-    fileInput.value = '';
+    if (uploadSection) uploadSection.style.display = 'block';
+    if (avatarPreview) avatarPreview.style.display = 'none';
+    if (fileInput) fileInput.value = '';
     chrome.storage.local.remove(['userAvatar']);
 }
 
@@ -244,13 +247,13 @@ function updateToggleStates() {
 
 function updateSelectionModeUI() {
     const isAutoDetectOff = !currentSettings.autoDetect;
-    selectionModeSection.style.display = isAutoDetectOff ? 'block' : 'none';
+    if (selectionModeSection) selectionModeSection.style.display = isAutoDetectOff ? 'block' : 'none';
     
     if (currentSettings.manualSelection && isAutoDetectOff) {
-        selectionInstructions.style.display = 'block';
+        if (selectionInstructions) selectionInstructions.style.display = 'block';
         sendMessageToContentScript({ action: 'ENABLE_MANUAL_SELECTION' });
     } else {
-        selectionInstructions.style.display = 'none';
+        if (selectionInstructions) selectionInstructions.style.display = 'none';
         sendMessageToContentScript({ action: 'DISABLE_MANUAL_SELECTION' });
     }
 }
@@ -269,15 +272,15 @@ function toggleManualSelection() {
 }
 
 function clearSelectedImage() {
-    selectedImagePreview.style.display = 'none';
+    if (selectedImagePreview) selectedImagePreview.style.display = 'none';
     chrome.storage.local.remove(['selectedImage']);
     sendMessageToContentScript({ action: 'CLEAR_IMAGE_SELECTION' });
 }
 
 function displaySelectedImage(imageData) {
-    selectedImage.src = imageData.src;
-    selectedImageInfo.textContent = `Selected from: ${imageData.domain}`;
-    selectedImagePreview.style.display = 'block';
+    if (selectedImage) selectedImage.src = imageData.src;
+    if (selectedImageInfo) selectedImageInfo.textContent = `Selected from: ${imageData.domain}`;
+    if (selectedImagePreview) selectedImagePreview.style.display = 'block';
 }
 
 async function sendMessageToContentScript(message) {
@@ -292,11 +295,12 @@ async function sendMessageToContentScript(message) {
 }
 
 function showStatus(message, type) {
+    if (!status) return;
     status.textContent = message;
     status.className = `status ${type}`;
     status.style.display = 'block';
     
     setTimeout(() => {
-        status.style.display = 'none';
+        if (status) status.style.display = 'none';
     }, 3000);
 }

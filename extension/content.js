@@ -48,13 +48,57 @@ class FitCheckContentScript {
     }
     
     return {
-      imageSelectors: ['img'],
+      imageSelectors: ['img[src*="product"]', 'img[alt*="model"]', 'img[width="500"]'],
       containerSelectors: ['body'],
       buttonPosition: 'after'
     };
   }
 
+  isClothingProductPage() {
+    const CLOTHING_KEYWORDS = [
+      'elbise', 'gömlek', 'ceket', 'pantolon', 'etek', 't-shirt',
+      'ayakkabi', 'giyim', 'ayakkabi', 'ceket',
+      'dress', 'shirt', 'jacket', 'pants', 'skirt', 'shoes', 'apparel', 'clothing', 'fashion'
+    ];
+
+    const jsonLdScripts = document.querySelectorAll('script[type="application/ld+json"]');
+    for (const script of jsonLdScripts) {
+      try {
+        const data = JSON.parse(script.textContent);
+        const dataString = JSON.stringify(data).toLowerCase();
+        const isProductOrOffer = dataString.includes('"@type":"product"') || dataString.includes('"@type":"offer"');
+        if (isProductOrOffer && CLOTHING_KEYWORDS.some(keyword => dataString.includes(keyword))) {
+          console.log('FitCheck (CS): Schema Markup ile kıyafet ürünü algılandı.');
+          return true;
+        }
+      } catch (e) {}
+    }
+
+    const sizeSelectors = [
+      '[id*="size-selector"]', '[class*="size-selector"]',
+      '[id*="beden-secimi"]', '[class*="beden-secimi"]',
+      'select[name*="size"]', 'select[id*="beden"]'
+    ];
+    if (sizeSelectors.some(selector => document.querySelector(selector))) {
+      console.log('FitCheck (CS): Beden seçici algılandı.');
+      return true;
+    }
+
+    const urlPath = window.location.pathname.toLowerCase();
+    if (CLOTHING_KEYWORDS.some(keyword => (urlPath.includes(keyword) && (urlPath.includes('/urun') || urlPath.includes('/product'))))) {
+      console.log("FitCheck (CS): URL'de kıyafet kategorisi/ürünü algılandı.");
+      return true;
+    }
+
+    return false;
+  }
+
   init() {
+    if (!this.isClothingProductPage()) {
+      console.log('FitCheck (CS): Sayfa kıyafet ürünü değil veya denemeye uygun değil. Otomatik başlatma durduruldu.');
+      return;
+    }
+
     this.observeDOM();
     this.processExistingImages();
   }
@@ -296,6 +340,10 @@ class FitCheckContentScript {
       </div>
     `;
     document.body.appendChild(modal);
+  }
+
+  showAuthRequiredError() {
+    this.showError('Authentication required. Please open the extension popup to sign in.');
   }
 
   createModal() {

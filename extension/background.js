@@ -1,7 +1,7 @@
-const API_ENDPOINT_URL = 'https://us-central1-fitcheck-project.cloudfunctions.net/virtual-try-on';
-const GET_FIREBASE_KEY_URLS = [
-  'https://get-firebase-key-gkxrzhyecq-uc.a.run.app',
-];
+const VIRTUAL_TRY_ON = 'https://process-virtual-try-on-654573246781.europe-west1.run.app';
+const API_ENDPOINT_URL = VIRTUAL_TRY_ON;
+const GET_FIREBASE_KEY_ = 'https://get-firebase-key-gkxrzhyecq-uc.a.run.app';
+const GET_FIREBASE_KEY_URLS = [GET_FIREBASE_KEY_];
 let FIREBASE_CONFIG = null;
 
 async function getFirebaseConfig() {
@@ -149,8 +149,4 @@ async function handleGetFirebaseConfig(sendResponse) {
     console.error('Error getting Firebase config:', error);
     sendResponse({ success: false, error: error.message });
   }
-}
-
-function handleFirebaseStateChange(firebaseData) {
-  // Firebase state updated
 }
