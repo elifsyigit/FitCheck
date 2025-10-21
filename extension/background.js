@@ -1,8 +1,33 @@
-const API_ENDPOINT_URL = 'https://us-central1-fitcheck-project.cloudfunctions.net/virtual-try-on';
-const GET_FIREBASE_KEY_URLS = [
-  'https://get-firebase-key-gkxrzhyecq-uc.a.run.app',
-];
+const VIRTUAL_TRY_ON = 'https://process-virtual-try-on-654573246781.europe-west1.run.app';
+const API_ENDPOINT_URL = VIRTUAL_TRY_ON;
+const GET_FIREBASE_KEY_ = 'https://get-firebase-key-gkxrzhyecq-uc.a.run.app';
+const GET_FIREBASE_KEY_URLS = [GET_FIREBASE_KEY_];
 let FIREBASE_CONFIG = null;
+
+// Extension verification (optional - only if EXTENSION_SECRET is set on server)
+const EXTENSION_SECRET = 'your-extension-secret-key'; // Store this securely or generate dynamically
+
+async function generateExtensionSignature() {
+  try {
+    // Try to use Web Crypto API if available
+    if (window.crypto && window.crypto.subtle) {
+      const crypto = new ExtensionCrypto(EXTENSION_SECRET);
+      return await crypto.generateExtensionSignature();
+    } else {
+      // Fallback to simple signature
+      const crypto = new ExtensionCrypto(EXTENSION_SECRET);
+      return crypto.generateSimpleSignature();
+    }
+  } catch (error) {
+    console.warn('Crypto not available, using fallback signature');
+    const timestamp = Date.now().toString();
+    const extensionId = chrome.runtime.id;
+    return { 
+      signature: btoa(`${extensionId}${timestamp}`), 
+      timestamp 
+    };
+  }
+}
 
 async function getFirebaseConfig() {
   if (FIREBASE_CONFIG) return FIREBASE_CONFIG;
@@ -24,7 +49,14 @@ async function getFirebaseConfig() {
   for (const url of GET_FIREBASE_KEY_URLS) {
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        const r = await fetch(url, { method: 'GET', headers: { 'Accept': 'application/json' } });
+        const { signature, timestamp } = await generateExtensionSignature();
+        const headers = { 
+          'Accept': 'application/json',
+          'X-Extension-Signature': signature,
+          'X-Extension-Timestamp': timestamp
+        };
+        
+        const r = await fetch(url, { method: 'GET', headers });
         if (r && r.ok) { resp = r; break; }
         const t = await r.text().catch(() => '');
         throw new Error(`HTTP ${r.status} ${t}`);
@@ -77,10 +109,6 @@ async function getFirebaseConfig() {
   return FIREBASE_CONFIG;
 }
 
-async function SecureAPIKey() {
-  const cfg = await getFirebaseConfig();
-  return cfg && cfg.apiKey ? cfg.apiKey : null;
-}
 
 async function handleVTORequest(requestData, sender, sendResponse) {
   try {
@@ -149,8 +177,4 @@ async function handleGetFirebaseConfig(sendResponse) {
     console.error('Error getting Firebase config:', error);
     sendResponse({ success: false, error: error.message });
   }
-}
-
-function handleFirebaseStateChange(firebaseData) {
-  // Firebase state updated
 }
