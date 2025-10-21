@@ -23,5 +23,5 @@ EXPOSE 8080
 # Define environment variable
 ENV NAME World
 
-# Run the application using Gunicorn
-CMD exec gunicorn --bind :$PORT --workers 1 --threads 8 --timeout 0 app:app
+# Run the application using Functions Framework
+CMD exec functions-framework --target=process_virtual_try_on --source=main.py --port=$PORT
