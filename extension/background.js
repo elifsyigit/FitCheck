@@ -1,113 +1,7 @@
-const VIRTUAL_TRY_ON = 'https://process-virtual-try-on-654573246781.europe-west1.run.app';
-const API_ENDPOINT_URL = VIRTUAL_TRY_ON;
-const GET_FIREBASE_KEY_ = 'https://get-firebase-key-gkxrzhyecq-uc.a.run.app';
-const GET_FIREBASE_KEY_URLS = [GET_FIREBASE_KEY_];
-let FIREBASE_CONFIG = null;
+const VIRTUAL_TRY_ON_SERVICE_URL = 'https://vto-service-654573246781.europe-west1.run.app';
+const API_ENDPOINT_URL = VIRTUAL_TRY_ON_SERVICE_URL;
 
-// Extension verification (optional - only if EXTENSION_SECRET is set on server)
-const EXTENSION_SECRET = 'your-extension-secret-key'; // Store this securely or generate dynamically
 
-async function generateExtensionSignature() {
-  try {
-    // Try to use Web Crypto API if available
-    if (window.crypto && window.crypto.subtle) {
-      const crypto = new ExtensionCrypto(EXTENSION_SECRET);
-      return await crypto.generateExtensionSignature();
-    } else {
-      // Fallback to simple signature
-      const crypto = new ExtensionCrypto(EXTENSION_SECRET);
-      return crypto.generateSimpleSignature();
-    }
-  } catch (error) {
-    console.warn('Crypto not available, using fallback signature');
-    const timestamp = Date.now().toString();
-    const extensionId = chrome.runtime.id;
-    return { 
-      signature: btoa(`${extensionId}${timestamp}`), 
-      timestamp 
-    };
-  }
-}
-
-async function getFirebaseConfig() {
-  if (FIREBASE_CONFIG) return FIREBASE_CONFIG;
-
-  try {
-    const stored = await chrome.storage.local.get(['firebaseConfig', 'firebaseConfigFetchedAt']);
-    if (stored && stored.firebaseConfig) {
-      FIREBASE_CONFIG = stored.firebaseConfig;
-      return FIREBASE_CONFIG;
-    }
-  } catch (e) {
-    console.warn('Failed to read cached firebaseConfig', e);
-  }
-
-  async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-
-  let resp = null;
-  let lastErr = null;
-  for (const url of GET_FIREBASE_KEY_URLS) {
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        const { signature, timestamp } = await generateExtensionSignature();
-        const headers = { 
-          'Accept': 'application/json',
-          'X-Extension-Signature': signature,
-          'X-Extension-Timestamp': timestamp
-        };
-        
-        const r = await fetch(url, { method: 'GET', headers });
-        if (r && r.ok) { resp = r; break; }
-        const t = await r.text().catch(() => '');
-        throw new Error(`HTTP ${r.status} ${t}`);
-      } catch (e) {
-        lastErr = e;
-        const backoff = 250 * Math.pow(2, attempt);
-        console.warn(`getFirebaseConfig attempt ${attempt + 1} for ${url} failed:`, e, `backoff=${backoff}ms`);
-        await sleep(backoff);
-      }
-    }
-    if (resp && resp.ok) break;
-  }
-  if (!resp || !resp.ok) {
-    console.warn('Firebase config endpoint failed, using fallback config');
-    const fallbackConfig = {
-      apiKey: 'demo-api-key',
-      authDomain: 'fitcheck-project.firebaseapp.com',
-      projectId: 'fitcheck-project',
-      storageBucket: 'fitcheck-project.appspot.com',
-      messagingSenderId: 'demo-sender',
-      appId: 'demo-app'
-    };
-    FIREBASE_CONFIG = fallbackConfig;
-    return FIREBASE_CONFIG;
-  }
-
-  const body = await resp.json().catch(() => null);
-  const cfg = (body && (body.firebaseConfig || body.config)) || null;
-  if (!cfg) {
-    console.warn('Invalid firebase config response, using fallback config');
-    const fallbackConfig = {
-      apiKey: 'demo-api-key',
-      authDomain: 'fitcheck-project.firebaseapp.com',
-      projectId: 'fitcheck-project',
-      storageBucket: 'fitcheck-project.appspot.com',
-      messagingSenderId: 'demo-sender',
-      appId: 'demo-app'
-    };
-    FIREBASE_CONFIG = fallbackConfig;
-    return FIREBASE_CONFIG;
-  }
-
-  try {
-    await chrome.storage.local.set({ firebaseConfig: cfg, firebaseConfigFetchedAt: Date.now() });
-  } catch (e) {
-    console.warn('Failed to cache firebase config', e);
-  }
-
-  FIREBASE_CONFIG = cfg;
-  return FIREBASE_CONFIG;
-}
 
 
 async function handleVTORequest(requestData, sender, sendResponse) {
@@ -156,25 +50,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   } else if (request.action === 'OPEN_POPUP') {
     chrome.action.openPopup();
     return true;
-  } else if (request.action === 'FIREBASE_STATE_CHANGED') {
-    handleFirebaseStateChange(request.data);
-    return true;
-  } else if (request.action === 'GET_FIREBASE_CONFIG') {
-    handleGetFirebaseConfig(sendResponse);
-    return true;
   }
 });
 
-async function checkAuthStatus(sendResponse) {
-  sendResponse({ success: true, firebaseInitialized: !!FIREBASE_CONFIG });
-}
-
-async function handleGetFirebaseConfig(sendResponse) {
-  try {
-    const cfg = await getFirebaseConfig();
-    sendResponse({ success: true, config: cfg });
-  } catch (error) {
-    console.error('Error getting Firebase config:', error);
-    sendResponse({ success: false, error: error.message });
-  }
-}

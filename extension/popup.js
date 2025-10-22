@@ -20,51 +20,24 @@ let currentSettings = {
     notifications: true,
     manualSelection: false
 };
-let FIREBASE_CONFIG = null;
-
 let firebaseApp;
-
-async function getFirebaseConfig() {
-    return new Promise((resolve, reject) => {
-        try {
-            chrome.runtime.sendMessage({ action: 'GET_FIREBASE_CONFIG' }, (response) => {
-                if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
-                if (response && response.success && response.config) return resolve(response.config);
-                return reject(new Error(response && response.error ? response.error : 'Failed to get firebase config'));
-            });
-        } catch (e) {
-            reject(e);
-        }
-    });
-}
 
 
 async function initializeFirebase() {
     try {
         if (typeof firebase === 'undefined') {
             console.error('Firebase SDK not loaded');
-            updateAuthUI();
             return;
         }
 
-        FIREBASE_CONFIG = await getFirebaseConfig();
-
-        if (!FIREBASE_CONFIG) {
-            throw new Error('Failed to get Firebase configuration');
-        }
-
-        firebaseApp = firebase.initializeApp(FIREBASE_CONFIG);
-        updateAuthUI();
+        // Wait a bit for firebaseConfig.js to initialize Firebase
+        await new Promise(resolve => setTimeout(resolve, 200));
         
-        // Notify background script of Firebase state
-        chrome.runtime.sendMessage({ 
-          action: 'FIREBASE_STATE_CHANGED', 
-          data: { initialized: true } 
-        });
+        firebaseApp = firebase.app();
+        console.log('Firebase app retrieved successfully');
 
     } catch (error) {
         console.error('Firebase initialization failed:', error);
-        updateAuthUI();
         showStatus('Firebase initialization failed. Running in offline mode.', 'error');
     }
 }
@@ -75,12 +48,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupEventListeners();
     setupMessageListener();
 });
-
-function updateAuthUI() {
-    if (authStatus) {
-        authStatus.textContent = 'Firebase initialized (no authentication)';
-    }
-}
 
 
 async function loadStoredData() {

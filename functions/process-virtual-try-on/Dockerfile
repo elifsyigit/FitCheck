@@ -1,27 +1,21 @@
-# Use the official Python runtime as a parent image
+# Use a lean base image for Python
 FROM python:3.11-slim
 
-# Set environment variables
-ENV PYTHONUNBUFFERED=1
-ENV PORT=8080
-
-# Set the working directory in the container
+# Set the working directory inside the container
 WORKDIR /app
 
-# Copy requirements first for better caching
+# Copy and install dependencies
 COPY requirements.txt .
-
-# Install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the current directory contents into the container at /app
+# Copy your application code (app.py, utilities.py, get_secret.py, etc.)
 COPY . .
 
-# Make port 8080 available to the world outside this container
-EXPOSE 8080
+# Set the PORT environment variable (Cloud Run injects this, but it's good practice)
+ENV PORT 8080
+EXPOSE ${PORT}
 
-# Define environment variable
-ENV NAME World
-
-# Run the application using Functions Framework
-CMD exec functions-framework --target=process_virtual_try_on --source=main.py --port=$PORT
+# This command executes Gunicorn, binding it to the required address (0.0.0.0:8080)
+# This solves the "failed to start and listen" error.
+# It runs the 'app' object inside your 'app.py' file.
+CMD exec gunicorn --bind 0.0.0.0:${PORT} --workers 2 app:app

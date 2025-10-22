@@ -16,7 +16,8 @@
     "https://get-firebase-key-gkxrzhyecq-ew.a.run.app/*",
     "https://get-firebase-key-gkxrzhyecq-uc.a.run.app/*",
     "https://europe-west1-fitcheck-475119.cloudfunctions.net/*",
-    "https://us-central1-fitcheck-475119.cloudfunctions.net/*" 
+    "https://us-central1-fitcheck-475119.cloudfunctions.net/*",
+    "https://vto-service-654573246781.europe-west1.run.app/*"
   ],
   
   "content_security_policy": {
