@@ -1,8 +1,12 @@
 {
-  "functions": {
-    "source": "functions",
-    "runtime": "python311"
-  },
+  "functions": [
+    {
+      "source": "functions/get-firebase-key",
+      "runtime": "python311",
+      "codebase": "get-firebase-key",
+      "region": "europe-west1"
+    }
+  ],
   "firestore": {
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"

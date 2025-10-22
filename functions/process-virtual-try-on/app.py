@@ -1,45 +1,12 @@
-# Dosya Adı: app.py
-
 import os
-# Flask'tan yalnızca ihtiyacımız olan bileşenleri (Flask uygulaması, request objesi, JSON yanıtı) import ediyoruz.
 from flask import Flask, request, jsonify 
 from utilities import base64_to_part 
 from google import genai
 from google.genai import types
 from get_secret import get_secret_value
+#client
 
-# Flask uygulamasını başlatma (Gunicorn'ın bulacağı değişken)
 app = Flask(__name__)
-
-# Get API key safely
-def get_gemini_api_key():
-    """Safely retrieve Gemini API key from Secret Manager"""
-    try:
-        project_id = "fitcheck-475119" 
-        secret_id = "GEMINI_API_KEY_FITCHECK" 
-        # get_secret_value fonksiyonunun get_secret.py'de çalıştığını varsayıyoruz.
-        api_key = get_secret_value(project_id, secret_id) 
-        
-        if not api_key:
-            # Hata yönetimini Runtime hatasına çevirdik
-            raise RuntimeError("Failed to retrieve Gemini API key from Secret Manager")
-        
-        return api_key
-    except Exception as e:
-        raise RuntimeError(f"Error retrieving API key: {e}")
-
-# Initialize client with API key
-try:
-    API_KEY = get_gemini_api_key()
-    client = genai.Client(api_key=API_KEY)
-except RuntimeError as e:
-    # Başlangıçta başarısız olursa loglarız ve client'ı None yaparız
-    print(f"FATAL: Could not initialize Gemini client: {e}")
-    client = None
-except Exception as e:
-    # Diğer beklenmedik hatalar
-    print(f"Warning: Could not initialize Gemini client due to unexpected error: {e}")
-    client = None
 
 # FONKSİYONUNUZU FLASK ROUTE İLE EŞLEŞTİRİYORUZ
 # Cloud Run'ın HTTP isteğini alacağı ana rotayı ('/') tanımlarız.
@@ -82,14 +49,156 @@ def process_virtual_try_on():
     except Exception as e:
         return jsonify({"error": f'Error processing image data: {e}'}), 400
 
-
-    # API Çağrısı için Prompt (Aynı Kaldı)
     prompt_text = """
+
 You are a professional virtual try-on AI assistant. Your task is to create a photorealistic virtual try-on image with the following specifications:
 
+
+
 ## OBJECTIVE
+
 Generate a photorealistic virtual try-on image, seamlessly integrating a specified clothing item onto a person while rigidly preserving their facial identity, the clothing's exact appearance, and placing them in a completely new, distinct background.
-... [PROMPT'UNUZUN GERİ KALANI AYNEN BURADA] ...
+
+
+
+## INPUTS
+
+- FIRST IMAGE: Person image containing the target person (used for identity, pose, body shape, hair, accessories)
+
+- SECOND IMAGE: Garment image containing the target clothing item (used for color, style, texture, pattern)
+
+
+
+## PROCESSING STEPS
+
+1. Isolate the clothing item from the garment image, discarding any original model, mannequin, or background
+
+2. Identify the person (face, body shape, skin tone), pose, hair, and accessories from the person image
+
+3. Segment the person from the original background
+
+4. Generate a completely new and different background
+
+5. Analyze lighting cues and adapt for consistency with the new background
+
+
+
+## CORE CONSTRAINTS (ABSOLUTE CRITICAL)
+
+
+
+### Identity Lock
+
+- Maintain PERFECT facial identity, features, skin tone, and expression
+
+- ZERO alterations to the face are permitted
+
+- Treat the head region (including hair) as immutable unless occluded by garment
+
+- DO NOT GUESS OR HALLUCINATE FACIAL FEATURES
+
+
+
+### Garment Fidelity  
+
+- Preserve EXACT color (hue, saturation, brightness), pattern, texture, material properties
+
+- ZERO deviations in style, color, or visual appearance are allowed
+
+- Render the garment precisely as depicted in the garment image
+
+
+
+### Realistic Integration
+
+- Simulate physically plausible draping, folding, and fit
+
+- Ensure natural interaction with the body within the new background context
+
+
+
+## HIGH PRIORITY CONSTRAINTS
+
+
+
+### Pose Preservation
+
+- Retain the EXACT body pose and positioning of the person
+
+
+
+### Lighting Consistency
+
+- Apply lighting, shadows, and highlights perfectly consistent with the NEW background
+
+- Adjust subject lighting subtly to match the new scene
+
+- Prioritize natural look consistent with original subject's lighting
+
+
+
+## ADDITIONAL REQUIREMENTS
+
+- Scale garment accurately to match person's body proportions
+
+- Render natural occlusion where garment covers body parts
+
+- Maintain hair and accessories unless logically occluded
+
+- Render fine details (embroidery, seams, buttons, lace) with high fidelity
+
+- Ensure person fits logically within the new background environment
+
+
+
+## EDGE CASE HANDLING
+
+- Tight fitting clothing: Accurately depict fabric stretch and conformity to body contours
+
+- Transparent/sheer clothing: Realistically render transparency, showing underlying skin tone or layers appropriately
+
+- Complex garment geometry: Handle unusual shapes, layers, or asymmetrical designs with correct draping
+
+- Unusual poses: Ensure garment drape remains physically plausible even in non-standard or dynamic poses
+
+- Garment partially out of frame: Render the visible parts of the garment correctly; do not hallucinate missing sections
+
+- Low resolution inputs: Maximize detail preservation but prioritize realistic integration over inventing details not present in the inputs
+
+- Mismatched lighting inputs: Prioritize generating a coherent lighting environment based on the NEW background, adapting the garment and slightly adjusting the person's apparent lighting for a unified final image. Avoid harsh lighting clashes
+
+
+
+## PROHIBITIONS
+
+- DO NOT alter facial features, identity, expression, or skin tone
+
+- DO NOT modify intrinsic color, pattern, texture, or style of clothing
+
+- DO NOT retain ANY part of the original background
+
+- DO NOT change the person's pose
+
+- DO NOT introduce elements not present in input images
+
+- DO NOT hallucinate or guess facial details
+
+- DO NOT generate a background that is stylistically jarring or contextually nonsensical without explicit instruction
+
+
+
+## OUTPUT
+
+Generate ONLY a single, high-resolution, photorealistic image where the person appears to be naturally wearing the clothing item in a completely new background.
+
+
+
+CRITICAL: Return the image as Base64 encoded data in the format: "data:image/jpeg;base64,YOUR_BASE64_DATA_HERE"
+
+
+
+Do not include any text, explanations, or additional content - only the Base64 encoded image data.
+
 """
     
     # API Çağrısı ve Çıktı İşleme
