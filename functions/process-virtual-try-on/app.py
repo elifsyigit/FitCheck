@@ -240,7 +240,6 @@ Do not include any text, explanations, or additional content - only the Base64 e
     except Exception as e:
         return jsonify({"error": f'AI Processing Failed: {e}'}), 500
 
-# --- 3. SUNUCU BAŞLANGICI (CLOUD RUN'I BAŞLATMA HATASINI ÇÖZEN KISIM) ---
 
 if __name__ == '__main__':
     # Cloud Run/Gunicorn'ın dinlemesini sağlayan ana blok.

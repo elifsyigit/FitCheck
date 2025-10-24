@@ -3,14 +3,38 @@ class FitCheckContentScript {
     this.observer = null;
     this.processedImages = new Set();
     this.siteConfig = this.getSiteConfig();
-    this.manualSelectionMode = false;
-    this.imageClickListeners = new Map();
-    this.init();
-    this.setupMessageListener();
+    this.settings = { autoDetect: false };
+    this.injectStyles();
+    this.loadSettings();
+  }
+
+  injectStyles() {
+    if (document.getElementById('fitcheck-content-styles')) {
+      console.log('FitCheck (CS): Styles already loaded');
+      return;
+    }
+
+    const link = document.createElement('link');
+    link.id = 'fitcheck-content-styles';
+    link.rel = 'stylesheet';
+    link.href = chrome.runtime.getURL('content.css');
+    
+    link.onload = () => {
+      console.log('FitCheck (CS): CSS styles loaded successfully');
+    };
+    
+    link.onerror = () => {
+      console.error('FitCheck (CS): Failed to load CSS styles, injecting fallback styles');
+    };
+    
+    document.head.appendChild(link);
+    console.log('FitCheck (CS): Injecting CSS styles from:', chrome.runtime.getURL('content.css'));
   }
 
   getSiteConfig() {
+    console.log("getSiteConfig function is called")
     const hostname = window.location.hostname;
+    console.log('FitCheck (CS): Detected hostname:', hostname);
     
     if (hostname.includes('amazon')) {
       return {
@@ -93,31 +117,39 @@ class FitCheckContentScript {
     return false;
   }
 
+  async loadSettings() {
+    try {
+      const result = await chrome.storage.local.get(['settings']);
+      if (result.settings) {
+        this.settings = { ...this.settings, ...result.settings };
+        console.log('FitCheck (CS): Settings loaded:', this.settings);
+      }
+      this.init();
+    } catch (error) {
+      console.error('FitCheck (CS): Error loading settings:', error);
+      this.init();
+    }
+  }
+
   init() {
+    console.log('FitCheck (CS): Initializing content script');
+    console.log('FitCheck (CS): Auto-detect setting:', this.settings.autoDetect);
+    
+    if (!this.settings.autoDetect) {
+      console.log('FitCheck (CS): Auto-detect is disabled. Buttons will not be shown automatically.');
+      return;
+    }
+    
     if (!this.isClothingProductPage()) {
       console.log('FitCheck (CS): Sayfa kıyafet ürünü değil veya denemeye uygun değil. Otomatik başlatma durduruldu.');
       return;
     }
 
+    console.log('FitCheck (CS): Clothing product page detected, starting processing');
     this.observeDOM();
     this.processExistingImages();
   }
 
-  setupMessageListener() {
-    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-      switch (message.action) {
-        case 'ENABLE_MANUAL_SELECTION':
-          this.enableManualSelection();
-          break;
-        case 'DISABLE_MANUAL_SELECTION':
-          this.disableManualSelection();
-          break;
-        case 'CLEAR_IMAGE_SELECTION':
-          this.clearImageSelection();
-          break;
-      }
-    });
-  }
 
   observeDOM() {
     this.observer = new MutationObserver((mutations) => {
@@ -157,42 +189,81 @@ class FitCheckContentScript {
       return;
     }
 
+    // Debug: Log all image details
+    console.log('FitCheck (CS): Processing image element:', {
+      src: img.src,
+      alt: img.alt,
+      className: img.className,
+      id: img.id,
+      tagName: img.tagName,
+      parentElement: img.parentElement?.tagName,
+      parentClassName: img.parentElement?.className
+    });
+
     if (!this.isProductImage(img)) {
+      console.log('FitCheck (CS): Image not suitable for try-on:', img.src);
       return;
     }
 
+    console.log('FitCheck (CS): Processing suitable image:', img.src);
     this.processedImages.add(img.src);
     
-    if (this.manualSelectionMode) {
-      this.addImageClickListener(img);
-    } else {
-      setTimeout(() => {
-        this.injectTryOnButton(img);
-      }, 1000);
-    }
+    setTimeout(() => {
+      console.log('FitCheck (CS): Injecting try-on button for:', img.src);
+      this.injectTryOnButton(img);
+    }, 1000);
   }
 
   isProductImage(img) {
     const src = img.src.toLowerCase();
     const alt = (img.alt || '').toLowerCase();
     
+    // Debug logging
+    console.log('FitCheck (CS): Checking image:', {
+      src: img.src,
+      alt: img.alt,
+      naturalWidth: img.naturalWidth,
+      naturalHeight: img.naturalHeight,
+      offsetWidth: img.offsetWidth,
+      offsetHeight: img.offsetHeight
+    });
+    
+    // Reject non-image URLs (like page URLs)
+    if (!src.includes('.jpg') && !src.includes('.jpeg') && !src.includes('.png') && 
+        !src.includes('.webp') && !src.includes('.gif') && !src.includes('data:image')) {
+      console.log('FitCheck (CS): Rejected - not an image URL');
+      return false;
+    }
+    
     if (src.includes('logo') || src.includes('icon') || src.includes('avatar')) {
+      console.log('FitCheck (CS): Rejected - contains logo/icon/avatar');
+      return false;
+    }
+
+    if (src.includes('transparent') || src.includes('placeholder') || src.includes('loading')) {
+      console.log('FitCheck (CS): Rejected - transparent/placeholder/loading image');
       return false;
     }
 
     if (src.includes('data:') || src.includes('base64')) {
+      console.log('FitCheck (CS): Rejected - data/base64 image');
       return false;
     }
 
     const selectorMatch = this.siteConfig.imageSelectors.some(selector => {
       try {
-        return img.matches(selector);
+        const matches = img.matches(selector);
+        if (matches) {
+          console.log('FitCheck (CS): Matched selector:', selector);
+        }
+        return matches;
       } catch (e) {
         return false;
       }
     });
 
     if (selectorMatch) {
+      console.log('FitCheck (CS): Accepted - matched site selector');
       return true;
     }
 
@@ -201,25 +272,47 @@ class FitCheckContentScript {
       height: img.naturalHeight || img.offsetHeight
     };
 
-    return dimensions.width > 200 && dimensions.height > 200;
+    const sizeCheck = dimensions.width > 200 && dimensions.height > 200;
+    console.log('FitCheck (CS): Size check:', dimensions, 'Passed:', sizeCheck);
+    
+    return sizeCheck;
   }
 
   injectTryOnButton(img) {
     if (img.closest('.fitcheck-try-on-container')) {
+      console.log('FitCheck (CS): Button already exists for this image');
       return;
     }
 
-    const container = this.findImageContainer(img);
-    if (!container) return;
-
-    const button = this.createTryOnButton(img.src);
+    // Make sure the image container has relative positioning
+    const imgRect = img.getBoundingClientRect();
+    const container = img.parentElement;
     
-    if (this.siteConfig.buttonPosition === 'after') {
-      container.parentNode.insertBefore(button, container.nextSibling);
-    } else {
-      container.parentNode.insertBefore(button, container);
+    // Set the container to relative positioning if it's not already
+    if (container && getComputedStyle(container).position === 'static') {
+      container.style.position = 'relative';
     }
 
+    console.log('FitCheck (CS): Creating try-on button');
+    const button = this.createTryOnButton(img.src);
+    
+    console.log('FitCheck (CS): Image details:', {
+      imgSrc: img.src,
+      imgRect: imgRect,
+      container: container,
+      containerPosition: container ? getComputedStyle(container).position : 'none'
+    });
+    
+    // Insert the button directly into the image's parent container
+    if (container) {
+      container.appendChild(button);
+      console.log('FitCheck (CS): Button inserted into image container');
+    } else {
+      img.parentNode.appendChild(button);
+      console.log('FitCheck (CS): Button inserted into image parent');
+    }
+
+    console.log('FitCheck (CS): Try-on button injected successfully');
     this.animateButton(button);
   }
 
@@ -240,41 +333,10 @@ class FitCheckContentScript {
   createTryOnButton(imageUrl) {
     const container = document.createElement('div');
     container.className = 'fitcheck-try-on-container';
-    container.style.cssText = `
-      margin: 10px 0;
-      text-align: center;
-      opacity: 0;
-      transition: opacity 0.3s ease;
-    `;
 
     const button = document.createElement('button');
     button.className = 'fitcheck-try-on-button';
-    button.textContent = 'FitCheck: Try On';
-    button.style.cssText = `
-      background: #007bff;
-      color: white;
-      border: none;
-      padding: 12px 24px;
-      border-radius: 6px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      box-shadow: 0 2px 4px rgba(0,123,255,0.3);
-      transition: all 0.2s ease;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    `;
-
-    button.addEventListener('mouseenter', () => {
-      button.style.background = '#0056b3';
-      button.style.transform = 'translateY(-1px)';
-      button.style.boxShadow = '0 4px 8px rgba(0,123,255,0.4)';
-    });
-
-    button.addEventListener('mouseleave', () => {
-      button.style.background = '#007bff';
-      button.style.transform = 'translateY(0)';
-      button.style.boxShadow = '0 2px 4px rgba(0,123,255,0.3)';
-    });
+    button.textContent = 'Try On';
 
     button.addEventListener('click', () => {
       this.handleTryOnClick(imageUrl, button);
@@ -285,9 +347,23 @@ class FitCheckContentScript {
   }
 
   animateButton(buttonContainer) {
+    console.log('FitCheck (CS): Button positioned, container:', buttonContainer);
+    console.log('FitCheck (CS): Button container position:', {
+      offsetTop: buttonContainer.offsetTop,
+      offsetLeft: buttonContainer.offsetLeft,
+      offsetWidth: buttonContainer.offsetWidth,
+      offsetHeight: buttonContainer.offsetHeight,
+      style: buttonContainer.style.cssText
+    });
+    
+    // Add a subtle scale animation for better UX
+    buttonContainer.style.transform = 'scale(0.8)';
+    buttonContainer.style.opacity = '1';
+    
     setTimeout(() => {
-      buttonContainer.style.opacity = '1';
-    }, 100);
+      buttonContainer.style.transform = 'scale(1)';
+      console.log('FitCheck (CS): Button animation completed');
+    }, 150);
   }
 
   async handleTryOnClick(imageUrl, buttonElement) {
@@ -296,7 +372,6 @@ class FitCheckContentScript {
     
     button.textContent = 'Processing...';
     button.disabled = true;
-    button.style.background = '#6c757d';
 
     try {
       const response = await chrome.runtime.sendMessage({
@@ -319,7 +394,6 @@ class FitCheckContentScript {
     } finally {
       button.textContent = originalText;
       button.disabled = false;
-      button.style.background = '#007bff';
     }
   }
 
@@ -334,7 +408,7 @@ class FitCheckContentScript {
     const modal = this.createModal();
     const content = modal.querySelector('.modal-content');
     content.innerHTML = `
-      <div style="color: #dc3545; text-align: center;">
+      <div class="modal-error">
         <h3>Error</h3>
         <p>${message}</p>
       </div>
@@ -349,48 +423,15 @@ class FitCheckContentScript {
   createModal() {
     const modal = document.createElement('div');
     modal.className = 'fitcheck-modal';
-    modal.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0,0,0,0.8);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      z-index: 10000;
-    `;
 
     const content = document.createElement('div');
     content.className = 'modal-content';
-    content.style.cssText = `
-      background: white;
-      border-radius: 8px;
-      padding: 20px;
-      max-width: 90%;
-      max-height: 90%;
-      overflow: auto;
-    `;
 
     const img = document.createElement('img');
-    img.style.cssText = `
-      max-width: 100%;
-      max-height: 80vh;
-      display: block;
-    `;
 
     const closeBtn = document.createElement('button');
+    closeBtn.className = 'modal-close-btn';
     closeBtn.textContent = 'Close';
-    closeBtn.style.cssText = `
-      background: #6c757d;
-      color: white;
-      border: none;
-      padding: 8px 16px;
-      border-radius: 4px;
-      margin-top: 10px;
-      cursor: pointer;
-    `;
 
     closeBtn.addEventListener('click', () => {
       document.body.removeChild(modal);
@@ -409,183 +450,6 @@ class FitCheckContentScript {
     return modal;
   }
 
-  enableManualSelection() {
-    this.manualSelectionMode = true;
-    this.removeAllTryOnButtons();
-    this.addClickListenersToAllImages();
-    this.showSelectionOverlay();
-  }
-
-  disableManualSelection() {
-    this.manualSelectionMode = false;
-    this.removeAllImageClickListeners();
-    this.hideSelectionOverlay();
-    this.removeAllTryOnButtons();
-  }
-
-  clearImageSelection() {
-    this.hideSelectionOverlay();
-  }
-
-  addImageClickListener(img) {
-    if (this.imageClickListeners.has(img)) {
-      return;
-    }
-
-    const clickHandler = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      this.selectImage(img);
-    };
-
-    img.addEventListener('click', clickHandler);
-    img.style.cursor = 'pointer';
-    img.style.border = '2px solid #007bff';
-    img.style.borderRadius = '4px';
-    img.style.transition = 'border-color 0.2s ease';
-
-    this.imageClickListeners.set(img, clickHandler);
-  }
-
-  removeImageClickListener(img) {
-    const clickHandler = this.imageClickListeners.get(img);
-    if (clickHandler) {
-      img.removeEventListener('click', clickHandler);
-      img.style.cursor = '';
-      img.style.border = '';
-      img.style.borderRadius = '';
-      img.style.transition = '';
-      this.imageClickListeners.delete(img);
-    }
-  }
-
-  addClickListenersToAllImages() {
-    const images = document.querySelectorAll('img');
-    images.forEach(img => {
-      if (this.isProductImage(img)) {
-        this.addImageClickListener(img);
-      }
-    });
-  }
-
-  removeAllImageClickListeners() {
-    this.imageClickListeners.forEach((clickHandler, img) => {
-      this.removeImageClickListener(img);
-    });
-  }
-
-  selectImage(img) {
-    const imageData = {
-      src: img.src,
-      alt: img.alt || '',
-      domain: window.location.hostname,
-      dimensions: {
-        width: img.naturalWidth || img.offsetWidth,
-        height: img.naturalHeight || img.offsetHeight
-      }
-    };
-
-    chrome.runtime.sendMessage({
-      action: 'IMAGE_SELECTED',
-      data: imageData
-    });
-
-    this.showImageSelectedFeedback(img);
-    this.injectTryOnButtonForSelectedImage(img);
-  }
-
-  showImageSelectedFeedback(img) {
-    const feedback = document.createElement('div');
-    feedback.className = 'fitcheck-selection-feedback';
-    feedback.textContent = '✓ Selected for Virtual Try-On';
-    feedback.style.cssText = `
-      position: absolute;
-      background: #28a745;
-      color: white;
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-size: 12px;
-      font-weight: 600;
-      z-index: 10000;
-      pointer-events: none;
-      animation: fadeInOut 2s ease-in-out;
-    `;
-
-    const rect = img.getBoundingClientRect();
-    feedback.style.left = `${rect.left}px`;
-    feedback.style.top = `${rect.top - 30}px`;
-
-    document.body.appendChild(feedback);
-
-    setTimeout(() => {
-      if (document.body.contains(feedback)) {
-        document.body.removeChild(feedback);
-      }
-    }, 2000);
-  }
-
-  injectTryOnButtonForSelectedImage(img) {
-    const container = this.findImageContainer(img);
-    if (!container) return;
-
-    const existingButton = container.parentNode.querySelector('.fitcheck-try-on-container');
-    if (existingButton) {
-      existingButton.remove();
-    }
-
-    const button = this.createTryOnButton(img.src);
-    
-    if (this.siteConfig.buttonPosition === 'after') {
-      container.parentNode.insertBefore(button, container.nextSibling);
-    } else {
-      container.parentNode.insertBefore(button, container);
-    }
-
-    this.animateButton(button);
-  }
-
-  showSelectionOverlay() {
-    const overlay = document.createElement('div');
-    overlay.id = 'fitcheck-selection-overlay';
-    overlay.style.cssText = `
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      background: #007bff;
-      color: white;
-      padding: 12px 16px;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 600;
-      z-index: 10000;
-      box-shadow: 0 4px 12px rgba(0,123,255,0.3);
-      animation: slideInRight 0.3s ease-out;
-    `;
-    overlay.textContent = 'Click on any image to select it for Virtual Try-On';
-
-    const style = document.createElement('style');
-    style.textContent = `
-      @keyframes slideInRight {
-        from { transform: translateX(100%); opacity: 0; }
-        to { transform: translateX(0); opacity: 1; }
-      }
-      @keyframes fadeInOut {
-        0% { opacity: 0; transform: scale(0.8); }
-        20% { opacity: 1; transform: scale(1); }
-        80% { opacity: 1; transform: scale(1); }
-        100% { opacity: 0; transform: scale(0.8); }
-      }
-    `;
-    document.head.appendChild(style);
-    document.body.appendChild(overlay);
-  }
-
-  hideSelectionOverlay() {
-    const overlay = document.getElementById('fitcheck-selection-overlay');
-    if (overlay) {
-      overlay.remove();
-    }
-  }
 
   removeAllTryOnButtons() {
     const buttons = document.querySelectorAll('.fitcheck-try-on-container');
@@ -596,16 +460,25 @@ class FitCheckContentScript {
     if (this.observer) {
       this.observer.disconnect();
     }
-    this.removeAllImageClickListeners();
     this.removeAllTryOnButtons();
-    this.hideSelectionOverlay();
   }
 }
 
+// Global instance for message handling
+let fitCheckInstance = null;
+
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
-    new FitCheckContentScript();
+    fitCheckInstance = new FitCheckContentScript();
   });
 } else {
-  new FitCheckContentScript();
+  fitCheckInstance = new FitCheckContentScript();
 }
+
+// Listen for messages from popup
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action === 'RELOAD_SETTINGS' && fitCheckInstance) {
+    console.log('FitCheck (CS): Reloading settings...');
+    fitCheckInstance.loadSettings();
+  }
+});

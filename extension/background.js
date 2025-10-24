@@ -17,7 +17,23 @@ async function handleVTORequest(requestData, sender, sendResponse) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`HTTP ${response.status}: ${errorText}`);
+      let userFriendlyMessage = '';
+      
+      switch (response.status) {
+        case 503:
+          userFriendlyMessage = 'Virtual Try-On service is temporarily unavailable. Please try again later.';
+          break;
+        case 500:
+          userFriendlyMessage = 'Server error occurred. Please try again.';
+          break;
+        case 400:
+          userFriendlyMessage = 'Invalid request. Please check your image and try again.';
+          break;
+        default:
+          userFriendlyMessage = `Service error (${response.status}). Please try again later.`;
+      }
+      
+      throw new Error(userFriendlyMessage);
     }
 
     const result = await response.json();
