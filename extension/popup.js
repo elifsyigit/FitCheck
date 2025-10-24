@@ -4,9 +4,7 @@ const avatarPreview = document.getElementById('avatarPreview');
 const avatarImg = document.getElementById('avatarImg');
 const avatarName = document.getElementById('avatarName');
 const status = document.getElementById('status');
-const authStatus = document.getElementById('authStatus');
 const selectionModeSection = document.getElementById('selectionModeSection');
-const manualSelectionToggle = document.getElementById('manualSelectionToggle');
 const selectionInstructions = document.getElementById('selectionInstructions');
 const selectedImagePreview = document.getElementById('selectedImagePreview');
 const selectedImage = document.getElementById('selectedImage');
@@ -30,7 +28,7 @@ async function initializeFirebase() {
             return;
         }
 
-        // Wait a bit for firebaseConfig.js to initialize Firebase
+        // Waiting a bit for firebaseConfig.js to initialize Firebase
         await new Promise(resolve => setTimeout(resolve, 200));
         
         firebaseApp = firebase.app();
@@ -60,8 +58,9 @@ async function loadStoredData() {
         
         if (result.settings) {
             currentSettings = { ...currentSettings, ...result.settings };
-            updateToggleStates();
         }
+        
+        updateUI();
         
         if (result.selectedImage) {
             displaySelectedImage(result.selectedImage);
@@ -96,26 +95,17 @@ function setupEventListeners() {
         fileInput.click();
     });
     
-    // Authentication removed
-    
     clearSelectionBtn.addEventListener('click', clearSelectedImage);
     changeAvatarBtn.addEventListener('click', resetAvatar);
-    
-    // Toggle event listeners
-    const autoDetectToggleEl = document.getElementById('autoDetectToggle');
-    if (autoDetectToggleEl) {
-        autoDetectToggleEl.addEventListener('click', () => {
-            toggleSetting('autoDetect');
-        });
-    }
     
     document.getElementById('notificationsToggle').addEventListener('click', () => {
         toggleSetting('notifications');
     });
     
-    if (manualSelectionToggle) {
-        manualSelectionToggle.addEventListener('click', toggleManualSelection);
-    }
+    document.getElementById('autoDetectToggle').addEventListener('click', () => {
+        toggleSetting('autoDetect');
+    });
+    
 }
 
 function handleDragOver(e) {
@@ -194,50 +184,6 @@ function resetAvatar() {
 }
 
 
-
-function toggleSetting(setting) {
-    currentSettings[setting] = !currentSettings[setting];
-    updateToggleStates();
-    chrome.storage.local.set({ settings: currentSettings });
-}
-
-function updateToggleStates() {
-    Object.keys(currentSettings).forEach(key => {
-        const toggle = document.getElementById(`${key}Toggle`);
-        if (toggle) {
-            toggle.classList.toggle('active', currentSettings[key]);
-        }
-    });
-    
-    updateSelectionModeUI();
-}
-
-function updateSelectionModeUI() {
-    const isAutoDetectOff = !currentSettings.autoDetect;
-    if (selectionModeSection) selectionModeSection.style.display = isAutoDetectOff ? 'block' : 'none';
-    
-    if (currentSettings.manualSelection && isAutoDetectOff) {
-        if (selectionInstructions) selectionInstructions.style.display = 'block';
-        sendMessageToContentScript({ action: 'ENABLE_MANUAL_SELECTION' });
-    } else {
-        if (selectionInstructions) selectionInstructions.style.display = 'none';
-        sendMessageToContentScript({ action: 'DISABLE_MANUAL_SELECTION' });
-    }
-}
-
-function toggleManualSelection() {
-    currentSettings.manualSelection = !currentSettings.manualSelection;
-    updateToggleStates();
-    chrome.storage.local.set({ settings: currentSettings });
-    
-    if (currentSettings.manualSelection) {
-        showStatus('Manual selection enabled. Click on images to select them.', 'success');
-    } else {
-        showStatus('Manual selection disabled.', 'success');
-        clearSelectedImage();
-    }
-}
-
 function clearSelectedImage() {
     if (selectedImagePreview) selectedImagePreview.style.display = 'none';
     chrome.storage.local.remove(['selectedImage']);
@@ -270,4 +216,28 @@ function showStatus(message, type) {
     setTimeout(() => {
         if (status) status.style.display = 'none';
     }, 3000);
+}
+
+function toggleSetting(settingName) {
+    currentSettings[settingName] = !currentSettings[settingName];
+    chrome.storage.local.set({ settings: currentSettings });
+    updateUI();
+    
+    if (settingName === 'autoDetect') {
+        sendMessageToContentScript({ action: 'RELOAD_SETTINGS' });
+    }
+}
+
+function updateUI() {
+    // Update notifications toggle
+    const notificationsToggle = document.getElementById('notificationsToggle');
+    if (notificationsToggle) {
+        notificationsToggle.classList.toggle('active', currentSettings.notifications);
+    }
+    
+    // Update auto-detect toggle
+    const autoDetectToggle = document.getElementById('autoDetectToggle');
+    if (autoDetectToggle) {
+        autoDetectToggle.classList.toggle('active', currentSettings.autoDetect);
+    }
 }

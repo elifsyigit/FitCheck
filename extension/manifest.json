@@ -21,7 +21,7 @@
   ],
   
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' https://europe-west1-fitcheck-475119.cloudfunctions.net https://us-central1-fitcheck-475119.cloudfunctions.net https://get-firebase-key-gkxrzhyecq-ew.a.run.app https://get-firebase-key-gkxrzhyecq-uc.a.run.app https://*.googleapis.com https://*.firebaseapp.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com"
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' https://europe-west1-fitcheck-475119.cloudfunctions.net https://us-central1-fitcheck-475119.cloudfunctions.net https://get-firebase-key-gkxrzhyecq-ew.a.run.app https://get-firebase-key-gkxrzhyecq-uc.a.run.app https://*.googleapis.com https://*.firebaseapp.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com https://vto-service-654573246781.europe-west1.run.app"
   },
   
   "background": {
@@ -32,7 +32,9 @@
     {
       "matches": [
         "*://*.amazon.com/*",
-        "*://*.zara.com/*"
+        "*://*.zara.com/*",
+        "*://www.trendyol-milla.com/*",
+        "*://www.lcw.com/*"
       ],
       "js": ["content.js"],
       "run_at": "document_end"
@@ -52,8 +54,8 @@
   
   "web_accessible_resources": [
     {
-      "resources": ["styles/*", "assets/*"],
-      "matches": ["*://*.amazon.com/*", "*://*.zara.com/*"]
+      "resources": ["content.css", "styles/*", "assets/*"],
+      "matches": ["*://*.amazon.com/*", "*://*.zara.com/*", "*://www.trendyol-milla.com/*", "*://www.lcw.com/*"]
     }
   ]
 }
