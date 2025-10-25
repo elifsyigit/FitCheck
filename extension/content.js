@@ -5,6 +5,7 @@ class FitCheckContentScript {
     this.siteConfig = this.getSiteConfig();
     this.manualSelectionMode = false;
     this.imageClickListeners = new Map();
+    this.hoverButtons = new Map(); // Store hover buttons for each image
     this.init();
     this.setupMessageListener();
   }
@@ -122,9 +123,8 @@ class FitCheckContentScript {
     if (this.manualSelectionMode) {
       this.addImageClickListener(img);
     } else {
-      setTimeout(() => {
-        this.injectTryOnButton(img);
-      }, 1000);
+      // Add hover functionality instead of injecting button below
+      this.addHoverButton(img);
     }
   }
 
@@ -364,6 +364,7 @@ class FitCheckContentScript {
   enableManualSelection() {
     this.manualSelectionMode = true;
     this.removeAllTryOnButtons();
+    this.removeAllHoverButtons();
     this.addClickListenersToAllImages();
     this.showSelectionOverlay();
   }
@@ -373,6 +374,8 @@ class FitCheckContentScript {
     this.removeAllImageClickListeners();
     this.hideSelectionOverlay();
     this.removeAllTryOnButtons();
+    // Re-add hover buttons for existing images
+    this.processExistingImages();
   }
 
   clearImageSelection() {
@@ -544,6 +547,101 @@ class FitCheckContentScript {
     buttons.forEach(button => button.remove());
   }
 
+  addHoverButton(img) {
+    // Skip if already has hover button
+    if (this.hoverButtons.has(img)) {
+      return;
+    }
+
+    // Create floating button
+    const button = document.createElement('button');
+    button.className = 'fitcheck-hover-button';
+    button.innerHTML = '👔 Try On';
+    button.style.cssText = `
+      position: absolute;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+      z-index: 10000;
+      display: none;
+      opacity: 0;
+      transition: all 0.3s ease;
+      pointer-events: auto;
+      white-space: nowrap;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    `;
+
+    document.body.appendChild(button);
+    this.hoverButtons.set(img, button);
+
+    // Position button relative to image container
+    const positionButton = (e) => {
+      const rect = img.getBoundingClientRect();
+      
+      button.style.display = 'block';
+      // Position button at top-right corner of the image
+      button.style.left = `${rect.right + window.pageXOffset - 130}px`;
+      button.style.top = `${rect.top + window.pageYOffset + 10}px`;
+      
+      // Animate in
+      requestAnimationFrame(() => {
+        button.style.opacity = '1';
+        button.style.transform = 'scale(1)';
+      });
+    };
+
+    // Show button on hover
+    img.addEventListener('mouseenter', positionButton);
+    
+    // Hide button on mouse leave
+    const hideButton = () => {
+      button.style.opacity = '0';
+      button.style.transform = 'scale(0.8)';
+      setTimeout(() => {
+        button.style.display = 'none';
+      }, 300);
+    };
+    
+    img.addEventListener('mouseleave', hideButton);
+    button.addEventListener('mouseleave', hideButton);
+
+    // Keep button visible when hovering over it
+    button.addEventListener('mouseenter', () => {
+      button.style.opacity = '1';
+    });
+
+    // Update position on scroll
+    const updatePosition = () => {
+      if (button.style.display !== 'none') {
+        const rect = img.getBoundingClientRect();
+        button.style.left = `${rect.right + window.pageXOffset - 130}px`;
+        button.style.top = `${rect.top + window.pageYOffset + 10}px`;
+      }
+    };
+    
+    window.addEventListener('scroll', updatePosition, true);
+    window.addEventListener('resize', updatePosition);
+
+    // Handle button click
+    button.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.handleTryOnClick(img.src, button);
+    });
+  }
+
+  removeAllHoverButtons() {
+    this.hoverButtons.forEach((button, img) => {
+      button.remove();
+    });
+    this.hoverButtons.clear();
+  }
+
   destroy() {
     if (this.observer) {
       this.observer.disconnect();
@@ -551,6 +649,12 @@ class FitCheckContentScript {
     this.removeAllImageClickListeners();
     this.removeAllTryOnButtons();
     this.hideSelectionOverlay();
+    
+    // Remove hover buttons
+    this.hoverButtons.forEach((button, img) => {
+      button.remove();
+    });
+    this.hoverButtons.clear();
   }
 }
 
