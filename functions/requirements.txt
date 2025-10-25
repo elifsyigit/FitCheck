@@ -1,0 +1,7 @@
+# Combined requirements for all Firebase Functions
+google-genai>=0.8.0
+functions-framework>=3.0.0
+google-cloud-secret-manager>=2.16.0
+firebase_functions~=0.1.0
+flask
+firebase-admin>=6.0.0

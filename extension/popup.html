@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script src="lib/firebase-app.js"></script>
+    <script src="lib/firebase-auth.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FitCheck</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="header">
+        <div class="logo">FitCheck</div>
+        <div class="subtitle">Virtual Try-On Assistant</div>
+    </div>
+    
+    <div id="status" class="status"></div>
+    
+    <div id="uploadSection" class="upload-section">
+        <div class="upload-icon">📷</div>
+        <div class="upload-text">Upload Your Photo</div>
+        <div class="upload-hint">Drag & drop or click to select</div>
+        <button id="uploadBtn" class="upload-btn">Choose Photo</button>
+        <input type="file" id="fileInput" class="file-input" accept="image/*">
+    </div>
+    
+    <div id="avatarPreview" class="avatar-preview">
+        <img id="avatarImg" class="avatar-img" src="" alt="Avatar">
+        <div id="avatarName" class="avatar-name"></div>
+        <button id="changeAvatarBtn" class="change-btn">Change Photo</button>
+    </div>
+    
+    <div class="settings-section">
+        <div class="setting-item">
+            <div class="setting-label">Show notifications</div>
+            <div id="notificationsToggle" class="toggle active">
+                <div class="toggle-slider"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="selectionModeSection" class="settings-section" style="display: none;">
+        <div class="setting-item">
+            <div class="setting-label">Manual image selection</div>
+            <div id="manualSelectionToggle" class="toggle">
+                <div class="toggle-slider"></div>
+            </div>
+        </div>
+        <div id="selectionInstructions" class="selection-instructions" style="display: none;">
+            <p>Click on any image on the current page to select it for virtual try-on.</p>
+        </div>
+    </div>
+
+    <div id="selectedImagePreview" class="selected-image-preview" style="display: none;">
+        <div class="selected-image-header">Selected Image</div>
+        <img id="selectedImage" class="selected-image" src="" alt="Selected image">
+        <div id="selectedImageInfo" class="selected-image-info"></div>
+        <button id="clearSelectionBtn" class="clear-selection-btn">Clear Selection</button>
+    </div>
+    <script src="popup.js"></script>
+</body>
+</html>

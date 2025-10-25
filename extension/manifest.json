@@ -1,0 +1,54 @@
+{
+  "manifest_version": 3,
+  "name": "FitCheck",
+  "version": "1.0.0",
+  "description": "Try on clothes virtually with AI-powered fit analysis",
+  
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  
+  "host_permissions": [
+    "<all_urls>",
+    "https://get-firebase-key-gkxrzhyecq-ew.a.run.app/*",
+    "https://get-firebase-key-gkxrzhyecq-uc.a.run.app/*",
+    "https://europe-west1-fitcheck-475119.cloudfunctions.net/*",
+    "https://us-central1-fitcheck-475119.cloudfunctions.net/*" 
+  ],
+  
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' https://europe-west1-fitcheck-475119.cloudfunctions.net https://us-central1-fitcheck-475119.cloudfunctions.net https://get-firebase-key-gkxrzhyecq-ew.a.run.app https://get-firebase-key-gkxrzhyecq-uc.a.run.app https://*.googleapis.com https://*.firebaseapp.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com"
+  },
+  
+  "background": {
+    "service_worker": "background.js"
+  },
+  
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_end"
+    }
+  ],
+  
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "FitCheck - Virtual Try On"
+  },
+  
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  
+  "web_accessible_resources": [
+    {
+      "resources": ["styles/*", "assets/*"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
