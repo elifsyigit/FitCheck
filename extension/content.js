@@ -1,11 +1,16 @@
   class FitCheckContentScript {
   constructor() {
     this.observer = null;
+    // Track processed images by src (keep as Set to match existing code expectations)
     this.processedImages = new Set();
     this.siteConfig = this.getSiteConfig();
     this.settings = { autoDetect: false };
+    this.manualSelectionMode = false;
+    this.imageClickListeners = new Map();
+    this.hoverButtons = new Map();
     this.injectStyles();
     this.loadSettings();
+    this.setupMessageListener();
   }
 
   injectStyles() {
@@ -207,113 +212,100 @@
 
     console.log('FitCheck (CS): Processing suitable image:', img.src);
     this.processedImages.add(img.src);
-    
-    setTimeout(() => {
-      console.log('FitCheck (CS): Injecting try-on button for:', img.src);
-      this.injectTryOnButton(img);
-    }, 1000);
+
+    // Use manual selection mode if enabled, otherwise show hover button
+    if (this.manualSelectionMode) {
+      this.addImageClickListener(img);
+    } else {
+      // Slight delay to avoid layout thrashing on pages that load many images
+      setTimeout(() => {
+        this.addHoverButton(img);
+      }, 150);
+    }
   }
 
   isProductImage(img) {
-    const src = img.src.toLowerCase();
+    const src = (img.src || '').toLowerCase();
     const alt = (img.alt || '').toLowerCase();
-    
-    // Debug logging
-    console.log('FitCheck (CS): Checking image:', {
-      src: img.src,
-      alt: img.alt,
-      naturalWidth: img.naturalWidth,
-      naturalHeight: img.naturalHeight,
-      offsetWidth: img.offsetWidth,
-      offsetHeight: img.offsetHeight
-    });
-    
-    // Reject non-image URLs (like page URLs)
-    if (!src.includes('.jpg') && !src.includes('.jpeg') && !src.includes('.png') && 
-        !src.includes('.webp') && !src.includes('.gif') && !src.includes('data:image')) {
-      console.log('FitCheck (CS): Rejected - not an image URL');
-      return false;
-    }
-    
-    if (src.includes('logo') || src.includes('icon') || src.includes('avatar')) {
-      console.log('FitCheck (CS): Rejected - contains logo/icon/avatar');
-      return false;
+
+    // Quick rejects
+    if (!src) return false;
+    if (src.includes('data:') || src.includes('base64')) return false;
+    if (src.includes('logo') || src.includes('icon') || src.includes('avatar')) return false;
+
+    // Match configured selectors first
+    try {
+      const selectorMatch = this.siteConfig.imageSelectors.some(selector => img.matches && img.matches(selector));
+      if (selectorMatch) return true;
+    } catch (e) {
+      // ignore malformed selectors
     }
 
-    if (src.includes('transparent') || src.includes('placeholder') || src.includes('loading')) {
-      console.log('FitCheck (CS): Rejected - transparent/placeholder/loading image');
-      return false;
-    }
-
-    if (src.includes('data:') || src.includes('base64')) {
-      console.log('FitCheck (CS): Rejected - data/base64 image');
-      return false;
-    }
-
-    const selectorMatch = this.siteConfig.imageSelectors.some(selector => {
-      try {
-        const matches = img.matches(selector);
-        if (matches) {
-          console.log('FitCheck (CS): Matched selector:', selector);
-        }
-        return matches;
-      } catch (e) {
-        return false;
-      }
-    });
-
-    if (selectorMatch) {
-      console.log('FitCheck (CS): Accepted - matched site selector');
-      return true;
-    }
-
-    const dimensions = {
-      width: img.naturalWidth || img.offsetWidth,
-      height: img.naturalHeight || img.offsetHeight
-    };
-
-    const sizeCheck = dimensions.width > 200 && dimensions.height > 200;
-    console.log('FitCheck (CS): Size check:', dimensions, 'Passed:', sizeCheck);
-    
-    return sizeCheck;
+    // Fallback to size heuristic
+    const width = img.naturalWidth || img.width || img.offsetWidth;
+    const height = img.naturalHeight || img.height || img.offsetHeight;
+    return (width >= 200 && height >= 200) || alt.length > 0;
   }
 
-  injectTryOnButton(img) {
-    if (img.closest('.fitcheck-try-on-container')) {
-      console.log('FitCheck (CS): Button already exists for this image');
-      return;
-    }
 
-    // Make sure the image container has relative positioning
-    const imgRect = img.getBoundingClientRect();
-    const container = img.parentElement;
-    
-    // Set the container to relative positioning if it's not already
-    if (container && getComputedStyle(container).position === 'static') {
-      container.style.position = 'relative';
-    }
+  addHoverButton(img) {
+    // Skip if already has hover button
+    if (this.hoverButtons.has(img)) return;
 
-    console.log('FitCheck (CS): Creating try-on button');
-    const button = this.createTryOnButton(img);
-    
-    console.log('FitCheck (CS): Image details:', {
-      imgSrc: img.src,
-      imgRect: imgRect,
-      container: container,
-      containerPosition: container ? getComputedStyle(container).position : 'none'
-    });
-    
-    // Insert the button directly into the image's parent container
-    if (container) {
-      container.appendChild(button);
-      console.log('FitCheck (CS): Button inserted into image container');
-    } else {
-      img.parentNode.appendChild(button);
-      console.log('FitCheck (CS): Button inserted into image parent');
-    }
+    const button = document.createElement('button');
+    button.className = 'fitcheck-hover-button';
+    button.innerHTML = '👔 Try On';
+    button.style.cssText = `
+      position: absolute;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+      z-index: 10000;
+      display: none;
+      opacity: 0;
+      transition: all 0.2s ease;
+      pointer-events: auto;
+      white-space: nowrap;
+    `;
 
-    console.log('FitCheck (CS): Try-on button injected successfully');
-    this.animateButton(button);
+    document.body.appendChild(button);
+    this.hoverButtons.set(img, button);
+
+    const positionButton = () => {
+      const rect = img.getBoundingClientRect();
+      button.style.display = 'block';
+      button.style.left = `${rect.right + window.pageXOffset - 130}px`;
+      button.style.top = `${rect.top + window.pageYOffset + 10}px`;
+      requestAnimationFrame(() => {
+        button.style.opacity = '1';
+        button.style.transform = 'scale(1)';
+      });
+    };
+
+    const hideButton = () => {
+      button.style.opacity = '0';
+      button.style.transform = 'scale(0.8)';
+      setTimeout(() => { button.style.display = 'none'; }, 200);
+    };
+
+    img.addEventListener('mouseenter', positionButton);
+    img.addEventListener('mouseleave', hideButton);
+    button.addEventListener('mouseenter', () => { button.style.opacity = '1'; });
+    button.addEventListener('mouseleave', hideButton);
+
+    const updatePosition = () => {
+      if (button.style.display !== 'none') positionButton();
+    };
+    window.addEventListener('scroll', updatePosition, true);
+    window.addEventListener('resize', updatePosition);
+
+    button.addEventListener('click', (e) => { e.stopPropagation(); this.handleTryOnClick(img, button); });
   }
 
   findImageContainer(img) {

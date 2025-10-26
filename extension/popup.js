@@ -4,8 +4,6 @@ const avatarPreview = document.getElementById('avatarPreview');
 const avatarImg = document.getElementById('avatarImg');
 const avatarName = document.getElementById('avatarName');
 const status = document.getElementById('status');
-const selectionModeSection = document.getElementById('selectionModeSection');
-const selectionInstructions = document.getElementById('selectionInstructions');
 const selectedImagePreview = document.getElementById('selectedImagePreview');
 const selectedImage = document.getElementById('selectedImage');
 const selectedImageInfo = document.getElementById('selectedImageInfo');
@@ -14,9 +12,7 @@ const uploadBtn = document.getElementById('uploadBtn');
 const changeAvatarBtn = document.getElementById('changeAvatarBtn');
 
 let currentSettings = {
-    autoDetect: false,
-    notifications: true,
-    manualSelection: false
+    notifications: true
 };
 let firebaseApp;
 
@@ -81,46 +77,55 @@ function setupMessageListener() {
 }
 
 function setupEventListeners() {
-    fileInput.addEventListener('change', handleFileSelect);
+    if (fileInput) {
+        fileInput.addEventListener('change', handleFileSelect);
+    }
     
-    uploadSection.addEventListener('dragover', handleDragOver);
-    uploadSection.addEventListener('dragleave', handleDragLeave);
-    uploadSection.addEventListener('drop', handleDrop);
+    if (uploadSection) {
+        uploadSection.addEventListener('dragover', handleDragOver);
+        uploadSection.addEventListener('dragleave', handleDragLeave);
+        uploadSection.addEventListener('drop', handleDrop);
+        
+        uploadSection.addEventListener('click', () => {
+            if (fileInput) fileInput.click();
+        });
+    }
     
-    uploadSection.addEventListener('click', () => {
-        fileInput.click();
-    });
+    if (uploadBtn) {
+        uploadBtn.addEventListener('click', () => {
+            if (fileInput) fileInput.click();
+        });
+    }
     
-    uploadBtn.addEventListener('click', () => {
-        fileInput.click();
-    });
+    if (clearSelectionBtn) {
+        clearSelectionBtn.addEventListener('click', clearSelectedImage);
+    }
     
-    clearSelectionBtn.addEventListener('click', clearSelectedImage);
-    changeAvatarBtn.addEventListener('click', resetAvatar);
+    if (changeAvatarBtn) {
+        changeAvatarBtn.addEventListener('click', resetAvatar);
+    }
     
-    document.getElementById('notificationsToggle').addEventListener('click', () => {
-        toggleSetting('notifications');
-    });
-    
-    document.getElementById('autoDetectToggle').addEventListener('click', () => {
-        toggleSetting('autoDetect');
-    });
-    
+    const notificationsToggle = document.getElementById('notificationsToggle');
+    if (notificationsToggle) {
+        notificationsToggle.addEventListener('click', () => {
+            toggleSetting('notifications');
+        });
+    }
 }
 
 function handleDragOver(e) {
     e.preventDefault();
-    uploadSection.classList.add('dragover');
+    if (uploadSection) uploadSection.classList.add('dragover');
 }
 
 function handleDragLeave(e) {
     e.preventDefault();
-    uploadSection.classList.remove('dragover');
+    if (uploadSection) uploadSection.classList.remove('dragover');
 }
 
 function handleDrop(e) {
     e.preventDefault();
-    uploadSection.classList.remove('dragover');
+    if (uploadSection) uploadSection.classList.remove('dragover');
     
     const files = e.dataTransfer.files;
     if (files.length > 0) {
@@ -222,10 +227,6 @@ function toggleSetting(settingName) {
     currentSettings[settingName] = !currentSettings[settingName];
     chrome.storage.local.set({ settings: currentSettings });
     updateUI();
-    
-    if (settingName === 'autoDetect') {
-        sendMessageToContentScript({ action: 'RELOAD_SETTINGS' });
-    }
 }
 
 function updateUI() {
@@ -233,11 +234,5 @@ function updateUI() {
     const notificationsToggle = document.getElementById('notificationsToggle');
     if (notificationsToggle) {
         notificationsToggle.classList.toggle('active', currentSettings.notifications);
-    }
-    
-    // Update auto-detect toggle
-    const autoDetectToggle = document.getElementById('autoDetectToggle');
-    if (autoDetectToggle) {
-        autoDetectToggle.classList.toggle('active', currentSettings.autoDetect);
     }
 }
