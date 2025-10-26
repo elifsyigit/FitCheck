@@ -1,4 +1,4 @@
-class FitCheckContentScript {
+  class FitCheckContentScript {
   constructor() {
     this.observer = null;
     this.processedImages = new Set();
@@ -294,7 +294,7 @@ class FitCheckContentScript {
     }
 
     console.log('FitCheck (CS): Creating try-on button');
-    const button = this.createTryOnButton(img.src);
+    const button = this.createTryOnButton(img);
     
     console.log('FitCheck (CS): Image details:', {
       imgSrc: img.src,
@@ -330,7 +330,7 @@ class FitCheckContentScript {
     return img.parentElement;
   }
 
-  createTryOnButton(imageUrl) {
+  createTryOnButton(imgElement) {
     const container = document.createElement('div');
     container.className = 'fitcheck-try-on-container';
 
@@ -339,7 +339,7 @@ class FitCheckContentScript {
     button.textContent = 'Try On';
 
     button.addEventListener('click', () => {
-      this.handleTryOnClick(imageUrl, button);
+      this.handleTryOnClick(imgElement, button);
     });
 
     container.appendChild(button);
@@ -366,7 +366,7 @@ class FitCheckContentScript {
     }, 150);
   }
 
-  async handleTryOnClick(imageUrl, buttonElement) {
+  async handleTryOnClick(imgElement, buttonElement) {
     const button = buttonElement || document.querySelector('.fitcheck-try-on-button');
     const originalText = button.textContent;
     
@@ -374,11 +374,57 @@ class FitCheckContentScript {
     button.disabled = true;
 
     try {
+      // Fetch avatar image from storage
+      const storageResult = await chrome.storage.local.get(['userAvatar']);
+      if (!storageResult.userAvatar || !storageResult.userAvatar.base64) {
+        this.showError('Please upload your photo in the extension popup first');
+        button.textContent = originalText;
+        button.disabled = false;
+        return;
+      }
+      
+      const avatarImageBase64 = storageResult.userAvatar.base64;
+      
+      // Extract clothing image directly from the loaded img element
+      console.log('FitCheck (CS): Extracting image from img element');
+      let clothingImageBase64;
+      try {
+        // Use the already-loaded img element to avoid CORS issues
+        clothingImageBase64 = await this.extractImageFromElement(imgElement);
+        console.log('FitCheck (CS): Image extracted successfully, length:', clothingImageBase64.length);
+      } catch (error) {
+        console.error('FitCheck (CS): Failed to extract image from element:', error);
+        this.showError('Failed to extract image. Please try again.');
+        button.textContent = originalText;
+        button.disabled = false;
+        return;
+      }
+      
+      // Validate base64 images
+      if (!avatarImageBase64 || avatarImageBase64.length < 100) {
+        this.showError('Avatar image is invalid or too small');
+        button.textContent = originalText;
+        button.disabled = false;
+        return;
+      }
+      
+      if (!clothingImageBase64 || clothingImageBase64.length < 100) {
+        this.showError('Clothing image is invalid or too small');
+        button.textContent = originalText;
+        button.disabled = false;
+        return;
+      }
+      
+      console.log('FitCheck (CS): Sending request with both images');
+      console.log('FitCheck (CS): Avatar image length:', avatarImageBase64.length);
+      console.log('FitCheck (CS): Clothing image length:', clothingImageBase64.length);
+      
       const response = await chrome.runtime.sendMessage({
         action: 'REQUEST_VIRTUAL_TRY_ON',
         data: {
-          clothingImageBase64: null,
-          clothingUrl: imageUrl
+          avatarImageBase64: avatarImageBase64,
+          clothingImageBase64: clothingImageBase64,
+          clothingUrl: imgElement.src // Keep for reference, but API expects base64
         }
       });
 
@@ -390,6 +436,7 @@ class FitCheckContentScript {
         this.showError(response.error || 'Try-on failed');
       }
     } catch (error) {
+      console.error('FitCheck (CS): Error in handleTryOnClick:', error);
       this.showError('Failed to connect to FitCheck service');
     } finally {
       button.textContent = originalText;
@@ -418,6 +465,125 @@ class FitCheckContentScript {
 
   showAuthRequiredError() {
     this.showError('Authentication required. Please open the extension popup to sign in.');
+  }
+
+  async extractImageFromElement(imgElement) {
+    return new Promise((resolve, reject) => {
+      try {
+        // Ensure the image is fully loaded
+        if (!imgElement.complete) {
+          const self = this;
+          imgElement.onload = function() {
+            self.extractImageFromLoadedElement(imgElement, resolve, reject);
+          };
+          imgElement.onerror = function() {
+            reject(new Error('Image failed to load'));
+          };
+        } else {
+          this.extractImageFromLoadedElement(imgElement, resolve, reject);
+        }
+      } catch (error) {
+        reject(new Error(`Failed to extract image: ${error.message}`));
+      }
+    });
+  }
+
+  extractImageFromLoadedElement(imgElement, resolve, reject) {
+    try {
+      console.log('FitCheck (CS): Attempting to extract image from element');
+      console.log('FitCheck (CS): Image dimensions:', {
+        naturalWidth: imgElement.naturalWidth,
+        naturalHeight: imgElement.naturalHeight,
+        width: imgElement.width,
+        height: imgElement.height,
+        src: imgElement.src
+      });
+      
+      const canvas = document.createElement('canvas');
+      canvas.width = imgElement.naturalWidth || imgElement.width;
+      canvas.height = imgElement.naturalHeight || imgElement.height;
+      
+      console.log('FitCheck (CS): Canvas created with size:', canvas.width, 'x', canvas.height);
+      
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(imgElement, 0, 0);
+      console.log('FitCheck (CS): Image drawn to canvas successfully');
+      
+      // Convert to base64 with JPEG quality 0.92
+      let base64;
+      try {
+        base64 = canvas.toDataURL('image/jpeg', 0.92);
+        console.log('FitCheck (CS): Canvas converted to base64, length:', base64.length);
+        resolve(base64);
+      } catch (toDataURLError) {
+        console.error('FitCheck (CS): Canvas toDataURL error:', toDataURLError);
+        console.log('FitCheck (CS): Canvas tainted, trying background script fetch as fallback');
+        this.fetchImageViaBackgroundScript(imgElement.src)
+          .then(resolve)
+          .catch(reject);
+      }
+    } catch (error) {
+      console.error('FitCheck (CS): Canvas extraction error details:', error);
+      console.error('FitCheck (CS): Error name:', error.name);
+      console.error('FitCheck (CS): Error message:', error.message);
+      
+      // If canvas is tainted due to CORS, try alternative method
+      if (error.name === 'SecurityError' || error.message.includes('tainted')) {
+        console.log('FitCheck (CS): Canvas tainted, trying background script fetch as fallback');
+        this.fetchImageViaBackgroundScript(imgElement.src)
+          .then(resolve)
+          .catch(reject);
+      } else {
+        reject(new Error(`Canvas conversion failed: ${error.message}`));
+      }
+    }
+  }
+
+  async fetchImageViaBackgroundScript(imageUrl) {
+    console.log('FitCheck (CS): Requesting image via background script:', imageUrl);
+    try {
+      const response = await chrome.runtime.sendMessage({
+        action: 'FETCH_IMAGE',
+        data: { imageUrl }
+      });
+      
+      if (response.success) {
+        console.log('FitCheck (CS): Image fetched via background script successfully');
+        return response.base64;
+      } else {
+        throw new Error(response.error || 'Failed to fetch image');
+      }
+    } catch (error) {
+      console.error('FitCheck (CS): Background script fetch failed:', error);
+      throw error;
+    }
+  }
+
+  async loadImageIntoCanvas(imageUrl) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      
+      img.onload = function() {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          const base64 = canvas.toDataURL('image/jpeg', 0.92);
+          resolve(base64);
+        } catch (error) {
+          reject(new Error(`Canvas conversion failed: ${error.message}`));
+        }
+      };
+      
+      img.onerror = function() {
+        reject(new Error('Failed to load image'));
+      };
+      
+      img.src = imageUrl;
+    });
   }
 
   createModal() {
