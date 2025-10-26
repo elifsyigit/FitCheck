@@ -37,59 +37,69 @@
   }
 
   getSiteConfig() {
-    console.log("getSiteConfig function is called")
-    const hostname = window.location.hostname;
-    console.log('FitCheck (CS): Detected hostname:', hostname);
-    
-    if (hostname.includes('amazon')) {
-      return {
-        imageSelectors: [
-          '#landingImage',
-          '#imgTagWrapperId img',
-          '.a-dynamic-image',
-          '#main-image-container img',
-          '.image-main img'
-        ],
-        containerSelectors: [
-          '#imgTagWrapperId',
-          '#main-image-container',
-          '.image-main',
-          '#landingImage'
-        ],
-        buttonPosition: 'after'
-      };
-    } else if (hostname.includes('zara')) {
-      return {
-        imageSelectors: [
-          '.product-detail-images img',
-          '.media-image img',
-          '.product-image img',
-          '[data-testid="media-image"] img'
-        ],
-        containerSelectors: [
-          '.product-detail-images',
-          '.media-image',
-          '.product-image',
-          '[data-testid="media-image"]'
-        ],
-        buttonPosition: 'after'
-      };
-    }
-    
+    // Evrensel yapılandırma - tüm siteler için geçerli
     return {
-      imageSelectors: ['img[src*="product"]', 'img[alt*="model"]', 'img[width="500"]'],
-      containerSelectors: ['body'],
+      imageSelectors: [
+        'img[src*="product"]', 
+        'img[alt*="model"]', 
+        'img[alt*="clothing"]',
+        'img[alt*="dress"]',
+        'img[alt*="shirt"]',
+        'img[alt*="pants"]',
+        'img[alt*="shoes"]',
+        'img[alt*="jacket"]',
+        'img[alt*="elbise"]',
+        'img[alt*="gömlek"]',
+        'img[alt*="pantolon"]',
+        'img[alt*="ayakkabı"]',
+        'img[alt*="ceket"]',
+        'img[width="500"]',
+        'img[width="600"]',
+        'img[width="800"]',
+        '.product-image img',
+        '.product-detail img',
+        '.main-image img',
+        '.gallery img',
+        '.gallery-item img'
+      ],
+      containerSelectors: [
+        '.product-image',
+        '.product-detail',
+        '.main-image',
+        '.gallery',
+        '.gallery-item',
+        '.image-container',
+        '.product-container',
+        'body'
+      ],
       buttonPosition: 'after'
     };
   }
 
   isClothingProductPage() {
     const CLOTHING_KEYWORDS = [
-      'elbise', 'gömlek', 'ceket', 'pantolon', 'etek', 't-shirt',
-      'ayakkabi', 'giyim', 'ayakkabi', 'ceket',
-      'dress', 'shirt', 'jacket', 'pants', 'skirt', 'shoes', 'apparel', 'clothing', 'fashion'
+      // Türkçe anahtar kelimeler
+      'elbise', 'gömlek', 'ceket', 'pantolon', 'etek', 't-shirt', 'tişört',
+      'ayakkabı', 'ayakkabi', 'giyim', 'kıyafet', 'kiyafet', 'moda', 'fashion',
+      'kadın', 'erkek', 'çocuk', 'bebek', 'unisex',
+      // İngilizce anahtar kelimeler
+      'dress', 'shirt', 'jacket', 'pants', 'skirt', 'shoes', 'apparel', 'clothing', 'fashion',
+      'blouse', 'trousers', 'jeans', 'sweater', 'hoodie', 'coat', 'blazer', 'suit',
+      'boots', 'sneakers', 'sandals', 'heels', 'flats', 'socks', 'underwear',
+      'accessories', 'bag', 'purse', 'belt', 'hat', 'scarf', 'gloves'
     ];
 
+    // 1. URL ve sayfa başlığı kontrolü
+    const url = window.location.href.toLowerCase();
+    const title = document.title.toLowerCase();
+    const urlAndTitle = `${url} ${title}`;
+    
+    if (CLOTHING_KEYWORDS.some(keyword => urlAndTitle.includes(keyword))) {
+      console.log('FitCheck (CS): URL/Başlıkta giyim anahtar kelimesi algılandı.');
+      return true;
+    }
+
+    // 2. Schema.org JSON-LD kontrolü
     const jsonLdScripts = document.querySelectorAll('script[type="application/ld+json"]');
     for (const script of jsonLdScripts) {
       try {
@@ -103,19 +113,65 @@
       } catch (e) {}
     }
 
+    // 3. E-ticaret eylem kelimeleri kontrolü
+    const ecommerceKeywords = [
+      'sepete ekle', 'add to cart', 'satın al', 'buy now', 'purchase',
+      'beden seç', 'size select', 'renk seç', 'color select',
+      'stok', 'stock', 'indirim', 'discount', 'sale', 'fiyat', 'price'
+    ];
+    
+    const pageText = document.body.textContent.toLowerCase();
+    if (ecommerceKeywords.some(keyword => pageText.includes(keyword))) {
+      console.log('FitCheck (CS): E-ticaret eylem kelimeleri algılandı.');
+      return true;
+    }
+
+    // 4. Beden seçici ve ürün özellikleri kontrolü
     const sizeSelectors = [
       '[id*="size-selector"]', '[class*="size-selector"]',
       '[id*="beden-secimi"]', '[class*="beden-secimi"]',
-      'select[name*="size"]', 'select[id*="beden"]'
+      'select[name*="size"]', 'select[id*="beden"]',
+      '[data-testid*="size"]', '[aria-label*="size"]',
+      'input[name*="size"]', 'input[id*="beden"]'
     ];
     if (sizeSelectors.some(selector => document.querySelector(selector))) {
       console.log('FitCheck (CS): Beden seçici algılandı.');
       return true;
     }
 
-    const urlPath = window.location.pathname.toLowerCase();
-    if (CLOTHING_KEYWORDS.some(keyword => (urlPath.includes(keyword) && (urlPath.includes('/urun') || urlPath.includes('/product'))))) {
-      console.log("FitCheck (CS): URL'de kıyafet kategorisi/ürünü algılandı.");
+    // 5. Sepete ekle/Satın al butonları kontrolü
+    const actionButtons = [
+      'button[class*="add-to-cart"]', 'button[class*="buy-now"]',
+      'button[class*="purchase"]', 'button[class*="order"]',
+      'a[class*="add-to-cart"]', 'a[class*="buy-now"]',
+      '[data-testid*="add-to-cart"]', '[data-testid*="buy-now"]',
+      'button:contains("Sepete Ekle")', 'button:contains("Add to Cart")',
+      'button:contains("Satın Al")', 'button:contains("Buy Now")'
+    ];
+    
+    for (const selector of actionButtons) {
+      if (document.querySelector(selector)) {
+        console.log('FitCheck (CS): E-ticaret butonu algılandı.');
+        return true;
+      }
+    }
+
+    // 6. Ürün görselleri kontrolü
+    const productImages = document.querySelectorAll('img');
+    let clothingImageCount = 0;
+    
+    for (const img of productImages) {
+      const src = img.src.toLowerCase();
+      const alt = (img.alt || '').toLowerCase();
+      const imageText = `${src} ${alt}`;
+      
+      if (CLOTHING_KEYWORDS.some(keyword => imageText.includes(keyword))) {
+        clothingImageCount++;
+      }
+    }
+    
+    if (clothingImageCount >= 2) {
+      console.log('FitCheck (CS): Birden fazla giyim görseli algılandı.');
       return true;
     }
 
@@ -137,20 +193,15 @@
   }
 
   init() {
-    console.log('FitCheck (CS): Initializing content script');
-    console.log('FitCheck (CS): Auto-detect setting:', this.settings.autoDetect);
-    
-    if (!this.settings.autoDetect) {
+    // Preserve autoDetect logic
+    if (typeof this.settings.autoDetect !== 'undefined' && !this.settings.autoDetect) {
       console.log('FitCheck (CS): Auto-detect is disabled. Buttons will not be shown automatically.');
       return;
     }
-    
     if (!this.isClothingProductPage()) {
       console.log('FitCheck (CS): Sayfa kıyafet ürünü değil veya denemeye uygun değil. Otomatik başlatma durduruldu.');
       return;
     }
-
-    console.log('FitCheck (CS): Clothing product page detected, starting processing');
     this.observeDOM();
     this.processExistingImages();
   }
@@ -632,11 +683,3 @@ if (document.readyState === 'loading') {
 } else {
   fitCheckInstance = new FitCheckContentScript();
 }
-
-// Listen for messages from popup
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.action === 'RELOAD_SETTINGS' && fitCheckInstance) {
-    console.log('FitCheck (CS): Reloading settings...');
-    fitCheckInstance.loadSettings();
-  }
-});
