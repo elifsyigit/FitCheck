@@ -7,7 +7,7 @@ app = Flask(__name__)
 
 VTO_FUNCTION_URL = os.environ.get(
     "VTO_FUNCTION_URL",
-    "https://us-central1-fitcheck-475119.cloudfunctions.net/process_virtual_try_on",
+    "https://process-virtual-try-on-654573246781.us-central1.run.app",
 )
 
 def convert_to_base64(data):
@@ -41,9 +41,7 @@ def convert_to_base64(data):
 
 @app.after_request
 def add_cors_headers(response):
-    # Allow all origins for now to support chrome-extension:// requests.
-    # For production, consider restricting this to your extension origin.
-    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Origin"] = "chrome-extension://cakcomphgnphkgkpekjjolnjnigmfkce"
     response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, Accept, Origin, X-Requested-With"
     return response

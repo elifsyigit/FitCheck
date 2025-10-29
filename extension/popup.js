@@ -92,7 +92,8 @@ function setupEventListeners() {
     }
     
     if (uploadBtn) {
-        uploadBtn.addEventListener('click', () => {
+        uploadBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent event from bubbling to uploadSection
             if (fileInput) fileInput.click();
         });
     }

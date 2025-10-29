@@ -1,9 +1,6 @@
 const VIRTUAL_TRY_ON_SERVICE_URL = 'https://us-central1-fitcheck-475119.cloudfunctions.net/process_virtual_try_on';
 const API_ENDPOINT_URL = VIRTUAL_TRY_ON_SERVICE_URL;
-const DEFAULT_FETCH_PROXY_URL = 'https://proxy-service-654573246781.europe-west1.run.app';
-
-
-
+const DEFAULT_FETCH_PROXY_URL = 'https://proxy-service-654573246781.us-central1.run.app';
 
 async function handleVTORequest(requestData, sender, sendResponse) {
   try {
@@ -73,7 +70,7 @@ async function handleVTORequest(requestData, sender, sendResponse) {
     if (result.error) {
       throw new Error(result.error);
     }
-
+    
     console.log('VTO Request - Success');
     sendResponse({ 
       success: true, 

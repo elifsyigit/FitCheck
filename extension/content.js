@@ -319,35 +319,24 @@
 
 
   addHoverButton(img) {
-    // Skip if already has hover button
     if (this.hoverButtons.has(img)) return;
 
     const button = document.createElement('button');
     button.className = 'fitcheck-hover-button';
-    button.innerHTML = '👔 Try On';
+    button.innerHTML = 'Try On';
     button.style.cssText = `
       position: absolute;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      border: none;
-      padding: 8px 14px;
-      border-radius: 20px;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
       z-index: 10000;
       display: none;
       opacity: 0;
-      transition: all 0.2s ease;
       pointer-events: auto;
-      white-space: nowrap;
     `;
 
     document.body.appendChild(button);
     this.hoverButtons.set(img, button);
 
     const positionButton = () => {
+      
       const rect = img.getBoundingClientRect();
       button.style.display = 'block';
       button.style.left = `${rect.right + window.pageXOffset - 130}px`;
@@ -357,23 +346,17 @@
         button.style.transform = 'scale(1)';
       });
     };
-
-    const hideButton = () => {
-      button.style.opacity = '0';
-      button.style.transform = 'scale(0.8)';
-      setTimeout(() => { button.style.display = 'none'; }, 200);
-    };
-
+    
     img.addEventListener('mouseenter', positionButton);
-    img.addEventListener('mouseleave', hideButton);
-    button.addEventListener('mouseenter', () => { button.style.opacity = '1'; });
-    button.addEventListener('mouseleave', hideButton);
-
-    const updatePosition = () => {
-      if (button.style.display !== 'none') positionButton();
-    };
-    window.addEventListener('scroll', updatePosition, true);
-    window.addEventListener('resize', updatePosition);
+    button.addEventListener('mouseenter', () => {
+      // Clear any pending hide timeout when hovering over button
+      if (hideButtonTimeout) {
+        clearTimeout(hideButtonTimeout);
+        hideButtonTimeout = null;
+      }
+      button.style.opacity = '1';
+      button.style.transform = 'scale(1)';
+    });
 
     button.addEventListener('click', (e) => { e.stopPropagation(); this.handleTryOnClick(img, button); });
   }
@@ -408,6 +391,13 @@
     return container;
   }
 
+  // Method to hide the hover button
+  hideHoverButton(button) {
+    button.style.opacity = '0';
+    button.style.transform = 'scale(0.8)';
+    setTimeout(() => { button.style.display = 'none'; }, 400); // Match transition duration
+  }
+
   animateButton(buttonContainer) {
     console.log('FitCheck (CS): Button positioned, container:', buttonContainer);
     console.log('FitCheck (CS): Button container position:', {
@@ -429,6 +419,7 @@
   }
 
     async handleTryOnClick(imgElement, buttonElement) {
+      this.hideHoverButton(buttonElement);
       const button = buttonElement || document.querySelector('.fitcheck-try-on-button');
       const originalText = button.textContent;
       
