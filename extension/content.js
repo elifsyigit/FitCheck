@@ -485,8 +485,7 @@
           action: 'REQUEST_VIRTUAL_TRY_ON',
           data: {
             avatarImageBase64: avatarImageBase64,
-            clothingImageBase64: clothingImageBase64,
-            clothingUrl: imgElement.src // Keep for reference, but API expects base64
+            clothingImageBase64: clothingImageBase64
           }
         });
 

@@ -7,7 +7,7 @@ const DEFAULT_FETCH_PROXY_URL = 'https://proxy-service-654573246781.europe-west1
 
 async function handleVTORequest(requestData, sender, sendResponse) {
   try {
-    const { avatarImageBase64, clothingImageBase64, clothingUrl } = requestData;
+    const { avatarImageBase64, clothingImageBase64 } = requestData;
     
     // Validate required fields
     if (!avatarImageBase64) {
@@ -29,13 +29,11 @@ async function handleVTORequest(requestData, sender, sendResponse) {
     
     console.log('VTO Request - Avatar image length:', avatarImageBase64.length);
     console.log('VTO Request - Clothing image length:', clothingImageBase64.length);
-    console.log('VTO Request - Clothing URL:', clothingUrl);
     
     const headers = { 'Content-Type': 'application/json' };
     const requestBody = { 
       avatarImageBase64, 
-      clothingImageBase64, 
-      clothingUrl 
+      clothingImageBase64
     };
     
     console.log('VTO Request - Sending to:', API_ENDPOINT_URL);
