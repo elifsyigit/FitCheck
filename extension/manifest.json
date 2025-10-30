@@ -3,7 +3,7 @@
   "name": "FitCheck",
   "version": "1.0.0",
   "description": "Try on clothes virtually with AI-powered fit analysis",
-  
+
   "permissions": [
     "activeTab",
     "scripting",
@@ -12,7 +12,22 @@
   
   "host_permissions": [
     "*://*.amazon.com/*",
+    "*://m.media-amazon.com/*",
     "*://*.zara.com/*",
+    "*://*.mncdn.com/*",
+    "*://*.hm.com/*",
+    "*://*.uniqlo.com/*",
+    "*://*.asos.com/*",
+    "*://*.nike.com/*",
+    "*://*.adidas.com/*",
+    "*://*.puma.com/*",
+    "*://shop.mango.com/*",
+    "*://*.zalando.com/*",
+    "*://*.macys.com/*",
+    "*://*.nordstrom.com/*",
+    "*://*.target.com/*",
+    "*://*.walmart.com/*",
+    "*://*.aliexpress.com/*",
     "https://get-firebase-key-gkxrzhyecq-ew.a.run.app/*",
     "https://get-firebase-key-gkxrzhyecq-uc.a.run.app/*",
     "https://proxy-service-654573246781.us-central1.run.app/*",
@@ -33,7 +48,20 @@
         "*://*.amazon.com/*",
         "*://*.zara.com/*",
         "*://www.trendyol-milla.com/*",
-        "*://www.lcw.com/*"
+        "*://www.lcw.com/*",
+        "*://*.hm.com/*",
+        "*://*.uniqlo.com/*",
+        "*://*.asos.com/*",
+        "*://*.nike.com/*",
+        "*://*.adidas.com/*",
+        "*://*.puma.com/*",
+        "*://shop.mango.com/*",
+        "*://*.zalando.com/*",
+        "*://*.macys.com/*",
+        "*://*.nordstrom.com/*",
+        "*://*.target.com/*",
+        "*://*.walmart.com/*",
+        "*://*.aliexpress.com/*"
       ],
       "js": ["content.js"],
       "run_at": "document_end"
@@ -46,13 +74,31 @@
   },
   
   "icons": {
-    "128": "icons/icon.png"
+    "128": "icons/icon128.png"
   },
   
   "web_accessible_resources": [
     {
       "resources": ["content.css", "styles/*", "assets/*"],
-      "matches": ["*://*.amazon.com/*", "*://*.zara.com/*", "*://www.trendyol-milla.com/*", "*://www.lcw.com/*"]
+      "matches": [
+        "*://*.amazon.com/*",
+        "*://*.zara.com/*",
+        "*://www.trendyol-milla.com/*",
+        "*://www.lcw.com/*",
+        "*://*.hm.com/*",
+        "*://*.uniqlo.com/*",
+        "*://*.asos.com/*",
+        "*://*.nike.com/*",
+        "*://*.adidas.com/*",
+        "*://*.puma.com/*",
+        "*://shop.mango.com/*",
+        "*://*.zalando.com/*",
+        "*://*.macys.com/*",
+        "*://*.nordstrom.com/*",
+        "*://*.target.com/*",
+        "*://*.walmart.com/*",
+        "*://*.aliexpress.com/*"
+      ]
     }
   ]
 }

@@ -89,38 +89,8 @@ async function handleVTORequest(requestData, sender, sendResponse) {
 async function handleFetchImage(requestData, sender, sendResponse) {
   try {
     const { imageUrl } = requestData;
-    
-    console.log('Background: Fetching image from:', imageUrl);
-    // First attempt: direct fetch (fastest when CORS allows)
-    let directResponse = null;
-    try {
-      directResponse = await fetch(imageUrl, { mode: 'cors' });
-    } catch (err) {
-      console.warn('Background: Direct fetch threw, will try proxy if available:', err.message);
-      directResponse = null;
-    }
-
-    if (directResponse && directResponse.ok) {
-      try {
-        const blob = await directResponse.blob();
-        const base64 = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
-        console.log('Background: Direct fetch succeeded and converted to base64, length:', base64.length);
-        sendResponse({ success: true, base64: base64 });
-        return;
-      } catch (err) {
-        console.warn('Background: Failed to convert direct fetch blob to base64, will try proxy:', err.message);
-        // fallthrough to proxy attempt
-      }
-    } else {
-      console.warn('Background: Direct fetch returned non-ok response or was blocked by CORS. Response:', directResponse && directResponse.status);
-    }
-
-    // Fallback: try proxy/cloud-run fetch.
+    console.log('Background: Fetching image via proxy for:', imageUrl);
+    // Always use proxy/cloud-run fetch to avoid page CSP and CORS issues.
     // Priority: use DEFAULT_FETCH_PROXY_URL (hard-coded), otherwise fall back to chrome.storage.local.fetchProxyUrl.
     // Set DEFAULT_FETCH_PROXY_URL to your deployed Cloud Run/proxy URL to make the extension use it by default.
     const { fetchProxyUrl } = await chrome.storage.local.get(['fetchProxyUrl']);
@@ -176,6 +146,84 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   } else if (request.action === 'OPEN_POPUP') {
     chrome.action.openPopup();
     return true;
+  } else if (request.action === 'CHECK_AVATAR') {
+    console.log("CHECK_AVATAR message is received.")
+    checkAvatarWithAI(request.imageData)
+      .then((result) => {
+        sendResponse(result);
+      })
+      .catch((err) => {
+        console.error('Background: CHECK_AVATAR failed:', err);
+        sendResponse({ success: false, message: String(err) });
+      });
+    return true; // keep the message channel open for async response
   }
 });
+
+// This function contains the logic to talk to the local, on-device AI model.
+async function checkAvatarWithAI(imageData) {
+  
+  // 1. Verify the on-device AI model is available
+  const available = await LanguageModel.availability();
+  if (available !== 'available') {
+    return { success: false, message: "The on-device AI model is not currently available." };
+  }
+
+  // 2. Define a prompt that asks the AI for a specific, structured answer
+  const prompt = `You are evaluating an image for a virtual try-on feature.
+  Criteria:
+  - The main visible subject should be a fully clothed human body (swimwear and sportswear acceptable if they cover private parts).
+  - No explicit nudity, sexual content, or depiction of minors.
+  - If unsure, default to safe (true).
+  Respond ONLY with a SINGLE JSON object (no extra text):
+  { "is_safe_for_tryon": true|false, "reason": "<brief explanation>" }`;
+  
+  // 3. Package the prompt and the image data for the API
+  // Attempt to parse a Data URL into inline data parts (mime + base64)
+  let inputParts;
+  try {
+    const match = typeof imageData === 'string' ? imageData.match(/^data:(.*?);base64,(.+)$/) : null;
+    if (match) {
+      const mime = match[1] || 'image/jpeg';
+      const b64 = match[2];
+      inputParts = [
+        { text: prompt },
+        { inline_data: { mime_type: mime, data: b64 } }
+      ];
+    } else {
+      inputParts = [
+        { text: prompt },
+        { text: 'Note: The image data URL could not be parsed. Assume a typical clothed portrait if uncertain.' }
+      ];
+    }
+  } catch (_) {
+    inputParts = [
+      { text: prompt },
+      { text: 'Note: Image parsing failed. Assume a typical clothed portrait if uncertain.' }
+    ];
+  }
+
+  // 4. Create an AI session and get the response
+  const session = await LanguageModel.create();
+  const response = await session.prompt(inputParts);
+  
+  // 5. Parse the structured response
+  try {
+    const text = typeof response === 'string' ? response : String(response || '');
+    // Extract the first JSON object if extra text is present
+    const jsonCandidate = (text.match(/\{[\s\S]*\}/) || [text])[0].trim();
+    const result = JSON.parse(jsonCandidate);
+    const isSafe = typeof result.is_safe_for_tryon === 'boolean' ? result.is_safe_for_tryon : true;
+    const reason = typeof result.reason === 'string' ? result.reason : '';
+    return {
+      success: true,
+      isSafe,
+      reason
+    };
+  } catch (e) {
+    console.error('Failed to parse AI response:', response, e);
+    return { success: false, message: 'AI provided an unreadable response. Try a different image.' };
+  }
+}
+
 

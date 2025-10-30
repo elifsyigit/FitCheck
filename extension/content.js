@@ -4,6 +4,7 @@
     this.processedImages = new Set();
     this.siteConfig = this.getSiteConfig();
     this.settings = { autoDetect: false };
+    this.buttonHideTimers = new Map();
     this.manualSelectionMode = false;
     this.imageClickListeners = new Map();
     this.hoverButtons = new Map();
@@ -345,17 +346,34 @@
         button.style.opacity = '1';
         button.style.transform = 'scale(1)';
       });
+      // Reset any previous hide timer for this image/button
+      const existing = this.buttonHideTimers.get(img);
+      if (existing) clearTimeout(existing);
+      // Auto-hide after a few seconds
+      const timerId = setTimeout(() => {
+        this.hideHoverButton(button);
+        this.buttonHideTimers.delete(img);
+      }, 3000);
+      this.buttonHideTimers.set(img, timerId);
     };
     
     img.addEventListener('mouseenter', positionButton);
     button.addEventListener('mouseenter', () => {
-      // Clear any pending hide timeout when hovering over button
-      if (hideButtonTimeout) {
-        clearTimeout(hideButtonTimeout);
-        hideButtonTimeout = null;
-      }
       button.style.opacity = '1';
       button.style.transform = 'scale(1)';
+      // Keep it visible while hovered by cancelling hide timer
+      const existing = this.buttonHideTimers.get(img);
+      if (existing) clearTimeout(existing);
+    });
+    button.addEventListener('mouseleave', () => {
+      // When leaving the button, schedule a shorter hide
+      const existing = this.buttonHideTimers.get(img);
+      if (existing) clearTimeout(existing);
+      const timerId = setTimeout(() => {
+        this.hideHoverButton(button);
+        this.buttonHideTimers.delete(img);
+      }, 1500);
+      this.buttonHideTimers.set(img, timerId);
     });
 
     button.addEventListener('click', (e) => { e.stopPropagation(); this.handleTryOnClick(img, button); });
@@ -500,8 +518,94 @@
       const modal = this.createModal();
       const img = modal.querySelector('img');
       img.src = `data:image/jpeg;base64,${imageBase64}`;
+    
+      // Create button container
+      const btnContainer = document.createElement('div');
+      btnContainer.className = 'modal-button-container';
+      btnContainer.style.cssText = `
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        margin-top: 10px;
+      `;
+    
+      // Download button
+      const downloadBtn = document.createElement('button');
+      downloadBtn.textContent = 'Download';
+      downloadBtn.addEventListener('click', () => {
+        const a = document.createElement('a');
+        a.href = img.src;
+        a.download = 'fitcheck-result.jpg';
+        a.click();
+      });
+    
+      // Share button
+      const shareBtn = document.createElement('button');
+      shareBtn.textContent = 'Share';
+      shareBtn.addEventListener('click', async () => {
+        if (navigator.share) {
+          try {
+            await navigator.share({
+              title: 'Check out my try-on!',
+              text: 'I just tried this outfit using FitCheck!',
+              files: [await this.dataURLtoFile(img.src, 'fitcheck-result.jpg')],
+            });
+          } catch (err) {
+            alert('Share failed: ' + err.message);
+          }
+        } else {
+          alert('Share API not supported in this browser');
+        }
+      });
+    
+      btnContainer.appendChild(downloadBtn);
+      btnContainer.appendChild(shareBtn);
+      modal.querySelector('.modal-content').appendChild(btnContainer);
+    
       document.body.appendChild(modal);
     }
+    
+    // Helper to convert base64 to File for Web Share API
+    dataURLtoFile(dataurl, filename) {
+      const arr = dataurl.split(',');
+      const mime = arr[0].match(/:(.*?);/)[1];
+      const bstr = atob(arr[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      while (n--) u8arr[n] = bstr.charCodeAt(n);
+      return new File([u8arr], filename, { type: mime });
+    }
+    
+    createModal() {
+      const modal = document.createElement('div');
+      modal.className = 'fitcheck-modal';
+    
+      const content = document.createElement('div');
+      content.className = 'modal-content';
+    
+      const img = document.createElement('img');
+    
+      const closeBtn = document.createElement('button');
+      closeBtn.className = 'modal-close-btn';
+      closeBtn.textContent = 'Close';
+    
+      closeBtn.addEventListener('click', () => {
+        document.body.removeChild(modal);
+      });
+    
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+          document.body.removeChild(modal);
+        }
+      });
+    
+      content.appendChild(img);
+      content.appendChild(closeBtn);
+      modal.appendChild(content);
+    
+      return modal;
+    }
+    
 
     showError(message) {
       const modal = this.createModal();
@@ -637,37 +741,6 @@
         img.src = imageUrl;
       });
     }
-
-    createModal() {
-      const modal = document.createElement('div');
-      modal.className = 'fitcheck-modal';
-
-      const content = document.createElement('div');
-      content.className = 'modal-content';
-
-      const img = document.createElement('img');
-
-      const closeBtn = document.createElement('button');
-      closeBtn.className = 'modal-close-btn';
-      closeBtn.textContent = 'Close';
-
-      closeBtn.addEventListener('click', () => {
-        document.body.removeChild(modal);
-      });
-
-      modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-          document.body.removeChild(modal);
-        }
-      });
-
-      content.appendChild(img);
-      content.appendChild(closeBtn);
-      modal.appendChild(content);
-
-      return modal;
-    }
-
 
     removeAllTryOnButtons() {
       const buttons = document.querySelectorAll('.fitcheck-try-on-container');

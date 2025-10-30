@@ -50,6 +50,15 @@ async function loadStoredData() {
         
         if (result.userAvatar) {
             displayAvatar(result.userAvatar);
+            // Trigger AI safety check for existing avatar
+            try {
+                const aiResult = await chrome.runtime.sendMessage({ action: 'CHECK_AVATAR', imageData: result.userAvatar.base64 });
+                if (aiResult && aiResult.success) {
+                    console.log('Avatar AI check:', aiResult);
+                }
+            } catch (e) {
+                console.warn('AI check (loadStoredData) failed:', e);
+            }
         }
         
         if (result.settings) {
@@ -162,14 +171,28 @@ function processFile(file) {
             fileSize: file.size
         };
         
-        try {
-            await chrome.storage.local.set({ userAvatar: avatarData });
-            displayAvatar(avatarData);
-            showStatus('Photo uploaded successfully!', 'success');
-            
-        } catch (error) {
-            showStatus('Error saving photo', 'error');
-        }
+		try {
+			// Validate avatar with on-device AI before saving
+			const aiResult = await chrome.runtime.sendMessage({ action: 'CHECK_AVATAR', imageData: base64Data });
+			console.log('CHECK_AVATAR message is sent');
+			if (!aiResult || !aiResult.success) {
+				// If AI is unavailable or errored, inform the user but proceed with upload
+				const msg = (aiResult && aiResult.message) ? aiResult.message : 'Could not verify photo with AI. Proceeding without check.';
+				showStatus(msg, 'success');
+			}
+			if (!aiResult.isSafe) {
+				showStatus(aiResult.reason ? `Cannot use this photo: ${aiResult.reason}` : 'Photo not allowed for try-on.', 'error');
+				if (fileInput) fileInput.value = '';
+				return;
+			}
+
+			// Save only if AI validation passed
+			await chrome.storage.local.set({ userAvatar: avatarData });
+			displayAvatar(avatarData);
+			showStatus('Photo uploaded successfully!', 'success');
+		} catch (error) {
+			showStatus('Error saving photo', 'error');
+		}
     };
     
     reader.readAsDataURL(file);
