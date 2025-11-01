@@ -5,8 +5,6 @@
     this.siteConfig = this.getSiteConfig();
     this.settings = { autoDetect: false };
     this.buttonHideTimers = new Map();
-    this.manualSelectionMode = false;
-    this.imageClickListeners = new Map();
     this.hoverButtons = new Map();
     this.injectStyles();
     this.loadSettings();
@@ -37,7 +35,6 @@
   }
 
   getSiteConfig() {
-    // Evrensel yapılandırma - tüm siteler için geçerli
     return {
       imageSelectors: [
         'img[src*="product"]', 
@@ -48,11 +45,6 @@
         'img[alt*="pants"]',
         'img[alt*="shoes"]',
         'img[alt*="jacket"]',
-        'img[alt*="elbise"]',
-        'img[alt*="gömlek"]',
-        'img[alt*="pantolon"]',
-        'img[alt*="ayakkabı"]',
-        'img[alt*="ceket"]',
         'img[width="500"]',
         'img[width="600"]',
         'img[width="800"]',
@@ -78,28 +70,23 @@
 
   isClothingProductPage() {
     const CLOTHING_KEYWORDS = [
-      // Türkçe anahtar kelimeler
-      'elbise', 'gömlek', 'ceket', 'pantolon', 'etek', 't-shirt', 'tişört',
-      'ayakkabı', 'ayakkabi', 'giyim', 'kıyafet', 'kiyafet', 'moda', 'fashion',
-      'kadın', 'erkek', 'çocuk', 'bebek', 'unisex',
-      // İngilizce anahtar kelimeler
       'dress', 'shirt', 'jacket', 'pants', 'skirt', 'shoes', 'apparel', 'clothing', 'fashion',
       'blouse', 'trousers', 'jeans', 'sweater', 'hoodie', 'coat', 'blazer', 'suit',
       'boots', 'sneakers', 'sandals', 'heels', 'flats', 'socks', 'underwear',
       'accessories', 'bag', 'purse', 'belt', 'hat', 'scarf', 'gloves'
     ];
 
-    // 1. URL ve sayfa başlığı kontrolü
+    //URL and Title Control
     const url = window.location.href.toLowerCase();
     const title = document.title.toLowerCase();
     const urlAndTitle = `${url} ${title}`;
     
     if (CLOTHING_KEYWORDS.some(keyword => urlAndTitle.includes(keyword))) {
-      console.log('FitCheck (CS): URL/Başlıkta giyim anahtar kelimesi algılandı.');
+      console.log('FitCheck (CS): Clothing keyword detected in URL/Title.');
       return true;
     }
 
-    // 2. Schema.org JSON-LD kontrolü
+    // 2. Schema mark up
     const jsonLdScripts = document.querySelectorAll('script[type="application/ld+json"]');
     for (const script of jsonLdScripts) {
       try {
@@ -107,7 +94,7 @@
         const dataString = JSON.stringify(data).toLowerCase();
         const isProductOrOffer = dataString.includes('"@type":"product"') || dataString.includes('"@type":"offer"');
         if (isProductOrOffer && CLOTHING_KEYWORDS.some(keyword => dataString.includes(keyword))) {
-          console.log('FitCheck (CS): Schema Markup ile kıyafet ürünü algılandı.');
+          console.log('FitCheck (CS): Clothing product detected with Schema Markup.');
           return true;
         }
       } catch (e) {}
@@ -115,48 +102,42 @@
 
     // 3. E-ticaret eylem kelimeleri kontrolü
     const ecommerceKeywords = [
-      'sepete ekle', 'add to cart', 'satın al', 'buy now', 'purchase',
-      'beden seç', 'size select', 'renk seç', 'color select',
-      'stok', 'stock', 'indirim', 'discount', 'sale', 'fiyat', 'price'
+      'add to cart','buy now', 'purchase',
+      'size select','color select',
+      'stock','discount', 'sale','price'
     ];
     
     const pageText = document.body.textContent.toLowerCase();
     if (ecommerceKeywords.some(keyword => pageText.includes(keyword))) {
-      console.log('FitCheck (CS): E-ticaret eylem kelimeleri algılandı.');
+      console.log('FitCheck (CS): E-commerce action words detected.');
       return true;
     }
 
-    // 4. Beden seçici ve ürün özellikleri kontrolü
     const sizeSelectors = [
       '[id*="size-selector"]', '[class*="size-selector"]',
-      '[id*="beden-secimi"]', '[class*="beden-secimi"]',
-      'select[name*="size"]', 'select[id*="beden"]',
-      '[data-testid*="size"]', '[aria-label*="size"]',
-      'input[name*="size"]', 'input[id*="beden"]'
+      'select[name*="size"]','[data-testid*="size"]',
+      '[aria-label*="size"]','input[name*="size"]',
     ];
     if (sizeSelectors.some(selector => document.querySelector(selector))) {
-      console.log('FitCheck (CS): Beden seçici algılandı.');
+      console.log('FitCheck (CS): Size selector detected.');
       return true;
     }
 
-    // 5. Sepete ekle/Satın al butonları kontrolü
     const actionButtons = [
       'button[class*="add-to-cart"]', 'button[class*="buy-now"]',
       'button[class*="purchase"]', 'button[class*="order"]',
       'a[class*="add-to-cart"]', 'a[class*="buy-now"]',
       '[data-testid*="add-to-cart"]', '[data-testid*="buy-now"]',
-      'button:contains("Sepete Ekle")', 'button:contains("Add to Cart")',
-      'button:contains("Satın Al")', 'button:contains("Buy Now")'
+      'button:contains("Add to Cart")','button:contains("Buy Now")'
     ];
     
     for (const selector of actionButtons) {
       if (document.querySelector(selector)) {
-        console.log('FitCheck (CS): E-ticaret butonu algılandı.');
+        console.log('FitCheck (CS): E-commerce button detected.');
         return true;
       }
     }
 
-    // 6. Ürün görselleri kontrolü
     const productImages = document.querySelectorAll('img');
     let clothingImageCount = 0;
     
@@ -171,7 +152,7 @@
     }
     
     if (clothingImageCount >= 2) {
-      console.log('FitCheck (CS): Birden fazla giyim görseli algılandı.');
+      console.log('FitCheck (CS): Multiple clothing images detected.');
       return true;
     }
 
@@ -197,17 +178,6 @@
       if (message.action === 'RELOAD_SETTINGS' && fitCheckInstance) {
         console.log('FitCheck (CS): Reloading settings...');
         fitCheckInstance.loadSettings();
-      }
-      switch (message.action) {
-        case 'ENABLE_MANUAL_SELECTION':
-          this.enableManualSelection && this.enableManualSelection();
-          break;
-        case 'DISABLE_MANUAL_SELECTION':
-          this.disableManualSelection && this.disableManualSelection();
-          break;
-        case 'CLEAR_IMAGE_SELECTION':
-          this.clearImageSelection && this.clearImageSelection();
-          break;
       }
     });
   }
@@ -265,17 +235,6 @@
       return;
     }
 
-    // Debug: Log all image details
-    console.log('FitCheck (CS): Processing image element:', {
-      src: img.src,
-      alt: img.alt,
-      className: img.className,
-      id: img.id,
-      tagName: img.tagName,
-      parentElement: img.parentElement?.tagName,
-      parentClassName: img.parentElement?.className
-    });
-
     if (!this.isProductImage(img)) {
       console.log('FitCheck (CS): Image not suitable for try-on:', img.src);
       return;
@@ -283,36 +242,27 @@
 
     console.log('FitCheck (CS): Processing suitable image:', img.src);
     this.processedImages.add(img.src);
-
-    // Use manual selection mode if enabled, otherwise show hover button
-    if (this.manualSelectionMode) {
-      this.addImageClickListener(img);
-    } else {
-      // Slight delay to avoid layout thrashing on pages that load many images
-      setTimeout(() => {
-        this.addHoverButton(img);
-      }, 150);
-    }
+    // Slight delay
+    setTimeout(() => {
+      this.addHoverButton(img);
+    }, 150);
   }
 
   isProductImage(img) {
     const src = (img.src || '').toLowerCase();
     const alt = (img.alt || '').toLowerCase();
 
-    // Quick rejects
     if (!src) return false;
     if (src.includes('data:') || src.includes('base64')) return false;
     if (src.includes('logo') || src.includes('icon') || src.includes('avatar')) return false;
 
-    // Match configured selectors first
     try {
       const selectorMatch = this.siteConfig.imageSelectors.some(selector => img.matches && img.matches(selector));
       if (selectorMatch) return true;
     } catch (e) {
-      // ignore malformed selectors
     }
 
-    // Fallback to size heuristic
+    // Fallback
     const width = img.naturalWidth || img.width || img.offsetWidth;
     const height = img.naturalHeight || img.height || img.offsetHeight;
     return (width >= 200 && height >= 200) || alt.length > 0;
@@ -426,7 +376,6 @@
       style: buttonContainer.style.cssText
     });
     
-    // Add a subtle scale animation for better UX
     buttonContainer.style.transform = 'scale(0.8)';
     buttonContainer.style.opacity = '1';
     
@@ -456,7 +405,6 @@
         
         const avatarImageBase64 = storageResult.userAvatar.base64;
         
-        // Extract clothing image directly from the loaded img element
         console.log('FitCheck (CS): Extracting image from img element');
         let clothingImageBase64;
         try {
@@ -466,21 +414,6 @@
         } catch (error) {
           console.error('FitCheck (CS): Failed to extract image from element:', error);
           this.showError('Failed to extract image. Please try again.');
-          button.textContent = originalText;
-          button.disabled = false;
-          return;
-        }
-        
-        // Validate base64 images
-        if (!avatarImageBase64 || avatarImageBase64.length < 100) {
-          this.showError('Avatar image is invalid or too small');
-          button.textContent = originalText;
-          button.disabled = false;
-          return;
-        }
-        
-        if (!clothingImageBase64 || clothingImageBase64.length < 100) {
-          this.showError('Clothing image is invalid or too small');
           button.textContent = originalText;
           button.disabled = false;
           return;
@@ -522,16 +455,11 @@
       // Create button container
       const btnContainer = document.createElement('div');
       btnContainer.className = 'modal-button-container';
-      btnContainer.style.cssText = `
-        display: flex;
-        justify-content: center;
-        gap: 10px;
-        margin-top: 10px;
-      `;
     
       // Download button
       const downloadBtn = document.createElement('button');
-      downloadBtn.textContent = 'Download';
+      downloadBtn.className = 'download-btn';
+      downloadBtn.textContent = '⬇ Download';
       downloadBtn.addEventListener('click', () => {
         const a = document.createElement('a');
         a.href = img.src;
@@ -541,7 +469,8 @@
     
       // Share button
       const shareBtn = document.createElement('button');
-      shareBtn.textContent = 'Share';
+      shareBtn.className = 'share-btn';
+      shareBtn.textContent = '🔗 Share';
       shareBtn.addEventListener('click', async () => {
         if (navigator.share) {
           try {
@@ -665,14 +594,13 @@
         ctx.drawImage(imgElement, 0, 0);
         console.log('FitCheck (CS): Image drawn to canvas successfully');
         
-        // Convert to base64 with JPEG quality 0.92
+        // Convert to base64
         let base64;
         try {
           base64 = canvas.toDataURL('image/jpeg', 0.92);
           console.log('FitCheck (CS): Canvas converted to base64, length:', base64.length);
           resolve(base64);
         } catch (toDataURLError) {
-          console.error('FitCheck (CS): Canvas toDataURL error:', toDataURLError);
           console.log('FitCheck (CS): Canvas tainted, trying background script fetch as fallback');
           this.fetchImageViaBackgroundScript(imgElement.src)
             .then(resolve)
@@ -683,15 +611,11 @@
         console.error('FitCheck (CS): Error name:', error.name);
         console.error('FitCheck (CS): Error message:', error.message);
         
-        // If canvas is tainted due to CORS, try alternative method
-        if (error.name === 'SecurityError' || error.message.includes('tainted')) {
-          console.log('FitCheck (CS): Canvas tainted, trying background script fetch as fallback');
-          this.fetchImageViaBackgroundScript(imgElement.src)
-            .then(resolve)
-            .catch(reject);
-        } else {
-          reject(new Error(`Canvas conversion failed: ${error.message}`));
-        }
+        // For ANY error, try proxy fallback
+        console.log('FitCheck (CS): Trying background script fetch as fallback');
+        this.fetchImageViaBackgroundScript(imgElement.src)
+          .then(resolve)
+          .catch(reject);
       }
     }
 

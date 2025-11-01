@@ -24,5 +24,4 @@ function initializeFirebaseWhenReady() {
     }
 }
 
-// Start initialization
 initializeFirebaseWhenReady();

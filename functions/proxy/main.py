@@ -19,7 +19,7 @@ def convert_to_base64(data):
     elif isinstance(data, list):
         return [convert_to_base64(item) for item in data]
     elif isinstance(data, str):
-        # Check if it's a URL pointing to an image
+        # Check if it's a URL to an image
         if data.startswith('http://') or data.startswith('https://'):
             try:
                 # Download the image
@@ -27,13 +27,12 @@ def convert_to_base64(data):
                 response.raise_for_status()
                 # Convert to base64
                 base64_string = base64.b64encode(response.content).decode('utf-8')
-                # Determine image format from content-type or URL
                 content_type = response.headers.get('content-type', 'image/jpeg')
                 image_format = content_type.split('/')[-1]
                 return f"data:image/{image_format};base64,{base64_string}"
             except Exception as e:
                 print(f"Failed to convert URL to base64: {data}, error: {e}", flush=True)
-                return data  # Return original if conversion fails
+                return data  #if conversion fails
         else:
             return data
     else:
@@ -69,11 +68,8 @@ def proxy_request():
                 # Download the image
                 response = requests.get(image_url, timeout=10)
                 response.raise_for_status()
-                
                 # Convert to base64
                 base64_string = base64.b64encode(response.content).decode('utf-8')
-                
-                # Determine image format from content-type or URL
                 content_type = response.headers.get('content-type', 'image/jpeg')
                 image_format = content_type.split('/')[-1]
                 
@@ -87,19 +83,15 @@ def proxy_request():
                 print(f"Proxy error while fetching image: {e}", flush=True)
                 return jsonify({"error": f"Failed to fetch image: {str(e)}"}), 500
         
-        # Otherwise, this is a VTO request - convert all images and forward to VTO
-        # Check for required VTO fields
         if "avatarImageBase64" not in data or "clothingImageBase64" not in data:
             return jsonify({"error": "Missing required images"}), 400
         
-        # Convert all images in the request to base64
         converted_data = convert_to_base64(data)
         
-        # Forward the request payload to the VTO function
         print(f"Proxy: forwarding request to VTO function at {VTO_FUNCTION_URL}", flush=True)
         vto_response = requests.post(VTO_FUNCTION_URL, json=converted_data, timeout=30)
         
-        # Try to parse the response as JSON safely
+        # parse the response
         try:
             result = vto_response.json()
         except ValueError:

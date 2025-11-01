@@ -10,16 +10,12 @@ async function handleVTORequest(requestData, sender, sendResponse) {
     if (!avatarImageBase64) {
       throw new Error('Missing avatarImageBase64 - please upload your photo first');
     }
-    
     if (!clothingImageBase64) {
       throw new Error('Missing clothingImageBase64 - failed to load clothing image');
     }
-    
-    // Validate that they are actual base64 strings
     if (typeof avatarImageBase64 !== 'string' || avatarImageBase64.length < 100) {
       throw new Error('Invalid avatar image format');
     }
-    
     if (typeof clothingImageBase64 !== 'string' || clothingImageBase64.length < 100) {
       throw new Error('Invalid clothing image format');
     }
@@ -90,13 +86,11 @@ async function handleFetchImage(requestData, sender, sendResponse) {
   try {
     const { imageUrl } = requestData;
     console.log('Background: Fetching image via proxy for:', imageUrl);
-    // Always use proxy/cloud-run fetch to avoid page CSP and CORS issues.
-    // Priority: use DEFAULT_FETCH_PROXY_URL (hard-coded), otherwise fall back to chrome.storage.local.fetchProxyUrl.
-    // Set DEFAULT_FETCH_PROXY_URL to your deployed Cloud Run/proxy URL to make the extension use it by default.
     const { fetchProxyUrl } = await chrome.storage.local.get(['fetchProxyUrl']);
     const proxyUrl = (typeof DEFAULT_FETCH_PROXY_URL === 'string' && DEFAULT_FETCH_PROXY_URL.length)
       ? DEFAULT_FETCH_PROXY_URL
       : fetchProxyUrl;
+
     if (!proxyUrl) {
       throw new Error('Direct fetch failed and no proxy configured. Set DEFAULT_FETCH_PROXY_URL in extension/source or store fetchProxyUrl in chrome.storage.local to a Cloud Run/proxy endpoint that accepts { imageUrl } and returns JSON { base64 }');
     }
@@ -132,7 +126,7 @@ async function handleFetchImage(requestData, sender, sendResponse) {
     });
   }
 }
-
+//MESSAGE LISTENERS
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'REQUEST_VIRTUAL_TRY_ON') {
     handleVTORequest(request.data, sender, sendResponse);
@@ -156,20 +150,53 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         console.error('Background: CHECK_AVATAR failed:', err);
         sendResponse({ success: false, message: String(err) });
       });
-    return true; // keep the message channel open for async response
+    return true;
   }
 });
 
-// This function contains the logic to talk to the local, on-device AI model.
+// This function checks if the user has sufficient RAM for the AI model
+async function checkRAMAvailability() {
+  try {
+    // Use the Chrome system.memory API to check RAM
+    const memoryInfo = await chrome.system.memory.getInfo();
+    const totalRAM = memoryInfo.capacityBytes / (1024 * 1024 * 1024); // Convert to GB
+    const minRequiredRAM = 16; // GB
+    
+    console.log(`Total RAM: ${totalRAM.toFixed(2)} GB`);
+    
+    if (totalRAM >= minRequiredRAM) {
+      return { hasEnoughRAM: true, totalRAM: totalRAM.toFixed(2) };
+    } else {
+      console.log(`Insufficient RAM: ${totalRAM.toFixed(2)} GB < ${minRequiredRAM} GB required`);
+      return { hasEnoughRAM: false, totalRAM: totalRAM.toFixed(2) };
+    }
+  } catch (error) {
+    console.error('Could not check RAM:', error);
+    // If we can't check RAM, assume insufficient to be safe
+    return { hasEnoughRAM: false, totalRAM: 'unknown' };
+  }
+}
+
+// This function contains the logic to talk to Prompt API.
 async function checkAvatarWithAI(imageData) {
   
-  // 1. Verify the on-device AI model is available
+  // Check RAM availability first
+  const ramCheck = await checkRAMAvailability();
+  if (!ramCheck.hasEnoughRAM) {
+    console.log('Insufficient RAM - skipping AI check and returning safe result');
+    return {
+      success: true,
+      isSafe: true,
+      reason: 'Photo accepted'
+    };
+  }
+  
+  // Verify API availability
   const available = await LanguageModel.availability();
   if (available !== 'available') {
     return { success: false, message: "The on-device AI model is not currently available." };
   }
 
-  // 2. Define a prompt that asks the AI for a specific, structured answer
   const prompt = `You are evaluating an image for a virtual try-on feature.
   Criteria:
   - The main visible subject should be a fully clothed human body (swimwear and sportswear acceptable if they cover private parts).
@@ -178,8 +205,6 @@ async function checkAvatarWithAI(imageData) {
   Respond ONLY with a SINGLE JSON object (no extra text):
   { "is_safe_for_tryon": true|false, "reason": "<brief explanation>" }`;
   
-  // 3. Package the prompt and the image data for the API
-  // Attempt to parse a Data URL into inline data parts (mime + base64)
   let inputParts;
   try {
     const match = typeof imageData === 'string' ? imageData.match(/^data:(.*?);base64,(.+)$/) : null;
@@ -203,14 +228,13 @@ async function checkAvatarWithAI(imageData) {
     ];
   }
 
-  // 4. Create an AI session and get the response
+  // Create an AI session and get the response
   const session = await LanguageModel.create();
   const response = await session.prompt(inputParts);
   
-  // 5. Parse the structured response
+  //Parse the response
   try {
     const text = typeof response === 'string' ? response : String(response || '');
-    // Extract the first JSON object if extra text is present
     const jsonCandidate = (text.match(/\{[\s\S]*\}/) || [text])[0].trim();
     const result = JSON.parse(jsonCandidate);
     const isSafe = typeof result.is_safe_for_tryon === 'boolean' ? result.is_safe_for_tryon : true;

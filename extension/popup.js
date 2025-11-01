@@ -24,7 +24,7 @@ async function initializeFirebase() {
             return;
         }
 
-        // Waiting a bit for firebaseConfig.js to initialize Firebase
+        //Initialize Firebase
         await new Promise(resolve => setTimeout(resolve, 200));
         
         firebaseApp = firebase.app();
@@ -50,7 +50,6 @@ async function loadStoredData() {
         
         if (result.userAvatar) {
             displayAvatar(result.userAvatar);
-            // Trigger AI safety check for existing avatar
             try {
                 const aiResult = await chrome.runtime.sendMessage({ action: 'CHECK_AVATAR', imageData: result.userAvatar.base64 });
                 if (aiResult && aiResult.success) {
@@ -64,8 +63,6 @@ async function loadStoredData() {
         if (result.settings) {
             currentSettings = { ...currentSettings, ...result.settings };
         }
-        
-        updateUI();
         
         if (result.selectedImage) {
             displaySelectedImage(result.selectedImage);
@@ -176,7 +173,7 @@ function processFile(file) {
 			const aiResult = await chrome.runtime.sendMessage({ action: 'CHECK_AVATAR', imageData: base64Data });
 			console.log('CHECK_AVATAR message is sent');
 			if (!aiResult || !aiResult.success) {
-				// If AI is unavailable or errored, inform the user but proceed with upload
+				// ?? If AI is unavailable or errored, inform the user but proceed with upload
 				const msg = (aiResult && aiResult.message) ? aiResult.message : 'Could not verify photo with AI. Proceeding without check.';
 				showStatus(msg, 'success');
 			}
@@ -232,7 +229,7 @@ async function sendMessageToContentScript(message) {
             await chrome.tabs.sendMessage(tab.id, message);
         }
     } catch (error) {
-        // Could not send message to content script
+        console.log("Could not send message to content script");
     }
 }
 
@@ -251,12 +248,4 @@ function toggleSetting(settingName) {
     currentSettings[settingName] = !currentSettings[settingName];
     chrome.storage.local.set({ settings: currentSettings });
     updateUI();
-}
-
-function updateUI() {
-    // Update notifications toggle
-    const notificationsToggle = document.getElementById('notificationsToggle');
-    if (notificationsToggle) {
-        notificationsToggle.classList.toggle('active', currentSettings.notifications);
-    }
 }

@@ -2,7 +2,7 @@ import base64
 from google.genai import types
 
 def detect_mime_type(base64_string):
-    """Base64 string'den MIME type'ı tespit eder."""
+    #Detects the MIME type from the Base64 string.
     if ',' in base64_string:
         header = base64_string.split(',')[0]
     else:
@@ -19,7 +19,7 @@ def detect_mime_type(base64_string):
     elif 'data:image/gif' in header:
         return "image/gif"
     else:
-        return "image/jpeg"  # Default
+        return "image/jpeg" 
 
 def base64_to_part(base64_string):
     """Base64 dizesini uygun MIME türüyle Part objesine dönüştürür."""

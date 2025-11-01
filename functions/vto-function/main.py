@@ -1,5 +1,4 @@
 from google import genai
-from google.genai import types
 from utilities import base64_to_part
 from get_secret import get_secret_value, YOUR_PROJECT_ID, YOUR_SECRET_ID, VERSION_ID
 from flask import Request, jsonify
@@ -193,7 +192,7 @@ Return the generated image as inline image data (not a textual base64 string).
 Do not include any captions or explanations — only output an image.
 
 """
-        # Call Gemini with simple retries for transient overloads
+        # call gemini with simple retries for transient overloads
         attempt = 0
         last_exc = None
         response = None
@@ -207,7 +206,7 @@ Do not include any captions or explanations — only output an image.
             except Exception as e:
                 message = str(e)
                 last_exc = e
-                # Retry on transient overload/unavailable
+                # Retry
                 if "UNAVAILABLE" in message or "overloaded" in message or "503" in message:
                     attempt += 1
                     if attempt < 3:
@@ -226,11 +225,10 @@ Do not include any captions or explanations — only output an image.
 
             first_part = content.parts[0]
 
-            # Sometimes Gemini returns text instead of inline_data if it failed
+            # Apparently sometimes Gemini returns text instead of inline_data if it failed
             inline_data = getattr(first_part, "inline_data", None)
             if not inline_data or not getattr(inline_data, "data", None):
                 print("DEBUG: No inline_data in response:", first_part)
-                # Optionally, log the text it returned
                 if hasattr(first_part, "text"):
                     print("DEBUG: Model text response:", first_part.text)
                 return jsonify({"error": "Model returned text instead of image"}), 500, headers
