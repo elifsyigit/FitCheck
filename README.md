@@ -21,3 +21,11 @@ FitCheck/
 ├── functions/       # Backend logic (Python Cloud Functions)
 ├── firebase.json    # Firebase project configuration
 └── README.md        # Project documentation
+```
+
+##🤝 Contributors
+
+- ** Elif Sena Yiğit**
+- ** Mısra Meriç**
+- ** Fatma Bahriye Topsakal**
+- ** Reyyan Zeynep Demirel**
