@@ -15,7 +15,7 @@
 
 ## 📂 Project Structure
 
-```text
+```
 FitCheck/
 ├── extension/       # Browser extension source code (Manifest, JS, HTML)
 ├── functions/       # Backend logic (Python Cloud Functions)
@@ -23,9 +23,9 @@ FitCheck/
 └── README.md        # Project documentation
 ```
 
-##🤝 Contributors
+## 🤝 Contributors
 
-- ** Elif Sena Yiğit**
-- ** Mısra Meriç**
-- ** Fatma Bahriye Topsakal**
-- ** Reyyan Zeynep Demirel**
+- Elif Sena Yiğit
+- Mısra Meriç
+- Fatma Bahriye Topsakal
+- Reyyan Zeynep Demirel
